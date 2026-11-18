@@ -11,11 +11,6 @@
   status = 200
 
 [[redirects]]
-  from = "/telegram-webhook"
-  to = "/.netlify/functions/telegram-webhook"
-  status = 200
-
-[[redirects]]
   from = "/monetag-postback"
   to = "/.netlify/functions/monetag-postback"
   status = 200
