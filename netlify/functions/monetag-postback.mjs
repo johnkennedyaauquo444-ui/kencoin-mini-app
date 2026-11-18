@@ -12,9 +12,10 @@ export default async req => {
   if (rewardType === "non_valued") return new Response("Unpaid event ignored", { status: 200 });
   if (rewardType !== "valued") return new Response("Unknown reward event", { status: 400 });
   try {
-    const sessions = await selectRows("kencoin_ad_sessions", "select=telegram_id,status&ymid=eq." + encodeURIComponent(ymid) + "&limit=1");
+    const sessions = await selectRows("kencoin_ad_sessions", "select=telegram_id,status,zone_id&ymid=eq." + encodeURIComponent(ymid) + "&limit=1");
     const session = sessions[0];
     if (!session) return new Response("Unknown ad session", { status: 404 });
+    if (String(session.zone_id) !== ZONE) return new Response("Ad session zone mismatch", { status: 403 });
     const telegramId = String(query.get("telegram_id") || session.telegram_id);
     if (telegramId !== String(session.telegram_id)) return new Response("User mismatch", { status: 403 });
     const result = await rpc("kencoin_credit_ad", {
