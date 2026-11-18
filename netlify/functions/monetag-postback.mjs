@@ -2,6 +2,7 @@ import { selectRows, rpc, sameSecret } from "./lib/db.mjs";
 
 const ZONE = "12287936";
 export default async req => {
+  if (req.method !== "GET") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET" } });
   const query = new URL(req.url).searchParams;
   if (!sameSecret(process.env.POSTBACK_SECRET || "", query.get("secret") || "")) return new Response("Forbidden", { status: 403 });
   const ymid = query.get("ymid") || "";
@@ -12,9 +13,11 @@ export default async req => {
   if (rewardType === "non_valued") return new Response("Unpaid event ignored", { status: 200 });
   if (rewardType !== "valued") return new Response("Unknown reward event", { status: 400 });
   try {
-    const sessions = await selectRows("kencoin_ad_sessions", "select=telegram_id,status,zone_id&ymid=eq." + encodeURIComponent(ymid) + "&limit=1");
+    const sessions = await selectRows("kencoin_ad_sessions", "select=telegram_id,status,zone_id,created_at&ymid=eq." + encodeURIComponent(ymid) + "&limit=1");
     const session = sessions[0];
     if (!session) return new Response("Unknown ad session", { status: 404 });
+    if (Date.now() - Date.parse(session.created_at) > 48 * 60 * 60 * 1000) return new Response("Ad session expired", { status: 410 });
+    if (session.status !== "pending") return new Response("Ad session already processed", { status: 200 });
     if (String(session.zone_id) !== ZONE) return new Response("Ad session zone mismatch", { status: 403 });
     const telegramId = String(query.get("telegram_id") || session.telegram_id);
     if (telegramId !== String(session.telegram_id)) return new Response("User mismatch", { status: 403 });
