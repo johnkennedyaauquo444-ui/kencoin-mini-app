@@ -121,7 +121,8 @@ declare inv kencoin_invoices%rowtype; last_expiry timestamptz; new_expiry timest
 begin
   select * into inv from kencoin_invoices where payload=p_payload for update;
   if not found then raise exception 'unknown_invoice'; end if;
-  if inv.telegram_id<>p_telegram_id then raise exception 'invoice_user_mismatch'; end if;
+  if inv.telegram_id<>p_telegram_id or split_part(p_payload,'_',2)<>inv.plan or split_part(p_payload,'_',3)<>p_telegram_id::text then raise exception 'invoice_user_mismatch'; end if;
+  if inv.created_at < now() - interval '24 hours' then raise exception 'invoice_expired'; end if;
   if p_currency<>'XTR' or p_total_amount<>inv.stars then raise exception 'payment_amount_or_currency_mismatch'; end if;
   if exists(select 1 from kencoin_invoices where telegram_charge_id=p_charge_id and payload<>p_payload) then raise exception 'charge_already_used'; end if;
   if inv.status='paid' then
