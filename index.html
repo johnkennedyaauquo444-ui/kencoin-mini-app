@@ -121,6 +121,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 .lock h3{color:var(--gold2);margin:9px 0}
 .lock p{font-size:11px;color:#c9b98f;margin:0}
 .empty{text-align:center;color:var(--muted);font-size:11px;padding:22px;line-height:1.7}
+.formlabel{display:block;color:var(--muted);font-size:10px;margin:12px 0 6px}
+.formfield{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#0d1218;color:var(--text);font:inherit;font-size:12px}
+.formnote{font-size:10px;color:var(--muted);line-height:1.6;margin-top:12px}
+.historyrow{padding:10px 0;border-bottom:1px solid var(--line);font-size:10px;line-height:1.6;white-space:normal}
+.historyrow:last-child{border:0}
 .bottom{
   position:fixed;bottom:0;left:0;right:0;z-index:5;
   background:#0d1117f5;border-top:1px solid #292f39;
@@ -208,7 +213,8 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
   <div class="heading"><h2>Tasks & Activities</h2><span>GET INVOLVED</span></div>
   <div class="panel">
     <div class="paneltop"><h3>Available Tasks</h3><span class="tag">TASK CENTRE</span></div>
-    <div class="item"><div><b>Join our Telegram channel</b><small>Follow official announcements</small></div><a class="price" href="https://t.me/NairaHackerAI_Official" target="_blank">OPEN ↗</a></div>
+    <div class="item"><div><b>Join our Telegram channel</b><small>Follow official announcements</small></div><a class="price" href="https://t.me/NairaHackerAI_Official" target="_blank" rel="noopener">OPEN ↗</a></div>
+    <button class="btn secondary" onclick="requestAction('task/channel')">VERIFY CHANNEL JOIN · 10 KNV</button>
     <div class="item"><div><b>Daily engagement</b><small>Check daily bonus eligibility</small></div><span class="price">DAILY</span></div>
     <div class="item"><div><b>Rewarded advertisement</b><small>Completion requires verification</small></div><span class="price">MONETAG</span></div>
     <p class="muted">Tasks are credited only after verified completion.</p>
@@ -222,14 +228,32 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
     <div class="amount" id="walletBalance">0 <span>KNV</span></div>
     <p class="muted">Only verified rewards and transactions should appear here.</p>
   </div>
-  <div class="lock">
+  <div class="lock" id="withdrawalLocked">
     <small>WITHDRAWAL STATUS</small>
     <h3>WITHDRAWAL LOCKED</h3>
     <p>Open on the day. Keep accumulating KNV.</p>
   </div>
+  <div class="panel" id="withdrawalPanel" hidden>
+    <h3>Request USDT withdrawal</h3>
+    <p class="muted" id="withdrawalAvailable">Available balance: 0 KNV</p>
+    <form id="withdrawalForm">
+      <label class="formlabel" for="withdrawalAmount">Amount (KNV)</label>
+      <input class="formfield" id="withdrawalAmount" name="amount" type="number" min="1" step="1" required placeholder="Enter KNV amount">
+      <label class="formlabel" for="withdrawalNetwork">USDT network</label>
+      <select class="formfield" id="withdrawalNetwork" name="network" required>
+        <option value="USDT_TRC20">USDT TRC20</option>
+        <option value="USDT_BEP20">USDT BEP20</option>
+      </select>
+      <label class="formlabel" for="withdrawalAddress">Wallet address</label>
+      <input class="formfield" id="withdrawalAddress" name="wallet_address" required autocomplete="off" placeholder="Paste your USDT wallet address">
+      <button class="btn" id="withdrawalSubmit" type="submit">SUBMIT WITHDRAWAL REQUEST</button>
+    </form>
+    <p class="formnote">The ₦2,000 service fee and actual network gas fee are shown separately during payout review. Requests are subject to admin approval.</p>
+    <p class="muted" id="withdrawalMinimum"></p>
+  </div>
   <div class="panel">
-    <h3>Withdrawal information</h3>
-    <p class="muted">Planned payout networks: USDT TRC20 and BEP20. Withdrawals cannot be submitted while locked. The ₦2,000 service fee and actual network gas fee will be shown separately when withdrawals open.</p>
+    <h3>Withdrawal history</h3>
+    <div id="withdrawalHistory" class="empty">No withdrawal requests yet.</div>
   </div>
 </section>
 
@@ -273,7 +297,7 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
   <div class="heading"><h2>Activity History</h2><span>YOUR RECORDS</span></div>
   <div class="panel">
     <h3>Transactions & Rewards</h3>
-    <div id="historyList" class="empty">Verified transactions and rewards will appear here when the secure account database is connected.</div>
+    <div id="historyList" class="empty">Verified transactions and rewards will appear here.</div>
   </div>
 </section>
 
@@ -296,13 +320,8 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
 const tg=window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
-
 const user=tg?.initDataUnsafe?.user;
 document.getElementById('username').textContent=user?.first_name||'Member';
-
-const API_BASE='';
-const MONETAG_ZONE_ID='12287936';
-
 function notify(message){
   const el=document.getElementById('toast');
   el.textContent=message;
@@ -310,105 +329,10 @@ function notify(message){
   clearTimeout(window.toastTimer);
   window.toastTimer=setTimeout(()=>el.style.display='none',3500);
 }
-
 function showPage(id){
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===id));
   window.scrollTo({top:0,behavior:'smooth'});
-}
-
-async function requestAction(action,data={}){
-  if(!tg?.initData){
-    notify('Please open Kencoin inside Telegram.');
-    return;
-  }
-  if(!API_BASE){
-    notify('Secure backend is not connected. No reward or balance change has been made.');
-    return;
-  }
-  try{
-    const response=await fetch(API_BASE+'/api/'+action,{
-      method:'POST',
-      headers:{
-        'Content-Type':'application/json',
-        'Authorization':'tma '+tg.initData
-      },
-      body:JSON.stringify(data)
-    });
-    const result=await response.json();
-    if(!response.ok)throw new Error(result.error||'Request failed');
-    if(result.balance!==undefined){
-      document.getElementById('balance').innerHTML=result.balance+' <span>KNV</span>';
-      document.getElementById('walletBalance').innerHTML=result.balance+' <span>KNV</span>';
-    }
-    notify(result.message||'Request received.');
-  }catch(error){
-    notify(error.message||'Unable to contact Kencoin server.');
-  }
-}
-
-async function watchAd(){
-  if(!tg?.initData || !user?.id){
-    notify('Open Kencoin inside Telegram first.');
-    return;
-  }
-  const showAd = window['show_'+MONETAG_ZONE_ID];
-  if(typeof showAd !== 'function'){
-    notify('Monetag is still loading. Please try again in a moment.');
-    return;
-  }
-  const button = document.querySelector('[onclick="watchAd()"]');
-  if(button){ button.disabled=true; button.textContent='LOADING AD...'; }
-  const randomPart = (window.crypto?.randomUUID?.() || (Date.now()+'_'+Math.random().toString(36).slice(2))).replace(/[^A-Za-z0-9_.-]/g,'');
-  const ymid = 'kc_'+user.id+'_'+randomPart;
-  document.getElementById('adstatus').textContent='Connecting to Monetag...';
-  try{
-    const result = await showAd({type:'end',ymid,requestVar:'daily_reward'});
-    if(result?.reward_event_type === 'valued'){
-      document.getElementById('adstatus').textContent='Monetag confirmed a valued ad event. Wallet credit still depends on secure server ledger verification.';
-      notify('Ad verified by Monetag. Wallet credit is pending server ledger processing.');
-    }else if(result?.reward_event_type === 'non_valued'){
-      document.getElementById('adstatus').textContent='This ad was not monetized. No KNV reward is due.';
-      notify('This ad was not monetized. No reward earned.');
-    }else{
-      document.getElementById('adstatus').textContent='Ad flow ended. Waiting for the server-side verification record.';
-      notify('Ad flow ended. Reward is not yet confirmed.');
-    }
-  }catch(error){
-    document.getElementById('adstatus').textContent='No verified ad event received. Please try again later.';
-    notify('Ad unavailable or verification failed. No reward was added.');
-  }finally{
-    if(button){ button.disabled=false; button.textContent='WATCH REWARDED AD'; }
-  }
-}
-
-async function buyPlan(plan){
-  if(!tg?.initData){
-    notify('Open Kencoin inside Telegram to purchase.');
-    return;
-  }
-  if(!API_BASE){
-    notify('Telegram Stars invoice service is not connected. No payment has been taken.');
-    return;
-  }
-  await requestAction('payment/create',{plan});
-}
-
-function invite(){
-  if(!user){
-    notify('Open Kencoin through Telegram first.');
-    return;
-  }
-  const link='https://t.me/KencoinOfficialBot?start='+user.id;
-  document.getElementById('referralLink').textContent=link;
-  const share='https://t.me/share/url?url='+encodeURIComponent(link);
-  if(tg?.openTelegramLink){
-    tg.openTelegramLink(share);
-  }else if(navigator.clipboard?.writeText){
-    navigator.clipboard.writeText(link).then(()=>notify('Referral link copied.'));
-  }else{
-    notify(link);
-  }
 }
 </script>
 <script src="/kencoin-client.js"></script>
