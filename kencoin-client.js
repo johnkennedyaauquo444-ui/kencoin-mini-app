@@ -90,6 +90,7 @@
       if (username) username.textContent = data.user?.first_name || "Member";
       renderHistory(data.history || []);
       const withdrawal = await call("/withdrawals");
+      if (walletBalance) walletBalance.innerHTML = Number(withdrawal.available_balance || 0).toLocaleString() + " <span>KNV</span>";
       renderWithdrawal(withdrawal);
     } catch (error) {
       note(error.message || "Could not load your Kencoin account.");
