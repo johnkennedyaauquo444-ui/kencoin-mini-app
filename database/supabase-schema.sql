@@ -181,6 +181,10 @@ begin
     update kencoin_withdrawals set status='rejected',admin_note=p_admin_note,reviewed_at=now() where id=p_withdrawal_id;
   elsif p_status='paid' then
     if w.status<>'approved' or coalesce(p_tx_reference,'')='' then raise exception 'approval_and_tx_reference_required'; end if;
+    -- Serialize payout finalization with new withdrawal requests for this wallet.
+    -- Without the shared lock, a concurrent request could read the pre-debit
+    -- balance together with the post-payout released reservation.
+    perform pg_advisory_xact_lock(w.telegram_id);
     insert into kencoin_ledger(telegram_id,amount,entry_type,reference,description,metadata)
     values(w.telegram_id,-w.amount,'withdrawal','withdrawal-'||w.id,'USDT withdrawal paid',jsonb_build_object('network',w.network,'tx_reference',p_tx_reference));
     update kencoin_withdrawals set status='paid',tx_reference=p_tx_reference,paid_at=now(),reviewed_at=coalesce(reviewed_at,now()) where id=p_withdrawal_id;
