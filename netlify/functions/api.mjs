@@ -47,6 +47,7 @@ export default async req=>{
   if(route==="referral/register"){
    const referrer=String(body.referrer_id||"");
    if(!/^\d{3,20}$/.test(referrer)||referrer===String(user.id))return json({error:"Invalid referral link."},400);
+   if(!(await getJSON("users/"+referrer)))return json({error:"Referral account was not found."},404);
    const existing=await getJSON("referrals/invitee/"+user.id);
    if(existing)return json({ok:true,already_registered:true});
    const saved=await putOnce("referrals/invitee/"+user.id,{invitee_id:String(user.id),referrer_id:referrer,created_at:new Date().toISOString()});
