@@ -1,63 +1,185 @@
-# Kencoin staging configuration and release gate
+# Kencoin staging setup and release gate
 
-## Netlify environment variables
-Set these in the Kencoin Netlify site before production:
-- `BOT_TOKEN`: token for `@KencoinOfficialBot`. Keep private; never place it in browser code.
-- `POSTBACK_SECRET`: long random secret shared only with the Monetag postback configuration.
-- `PAYMENT_CONFIRM_SECRET`: a different long random secret shared only with the Telebot Creator payment handler.
+Do not merge this branch into main or deploy until the external services below are configured and every live test passes.
 
-The ledger stores each reward as a separate, immutable event key and calculates the visible balance from those entries. It does not update one shared balance counter. Netlify Blobs is a key/value event store, not a full transactional financial database; do not enable cash withdrawals or treat displayed USD equivalents as guaranteed redeemable funds until a transactional payout ledger and funding controls are in place.
+## Included in staging
 
-## Monetag
-The Mini App loads the supplied zone SDK:
-`https://libtl.com/sdk.js` with zone `12287936` and global `show_12287936`.
+- Telegram Mini App authentication using Telegram-signed initData.
+- Supabase Postgres transactional wallet ledger.
+- Daily bonus: 3 KNV once per Lagos calendar day.
+- Verified official-channel join: 10 KNV once.
+- Monetag zone 12287936: 5 KNV only after a server-side valued impression; duplicate postbacks do not pay twice.
+- Telegram Stars: Silver 100, Gold 250, Diamond 500 Stars, each for 30 days. Invoice checkout opens inside the Mini App.
+- Referral attribution is recorded once; no referral reward is issued because no reward amount has been approved.
+- USDT TRC20/BEP20 withdrawal requests, balance reservation, admin review and transaction-reference tracking. Withdrawals remain locked until 1 April 2027 (date is not shown in the locked UI).
+- Private admin review page at /admin.html.
 
-Configure this GET postback URL in Monetag, replacing the site domain and secret:
-`https://YOUR-NETLIFY-SITE.netlify.app/monetag-postback?secret=YOUR_POSTBACK_SECRET&ymid={ymid}&zone_id={zone_id}&event_type={event_type}&reward_event_type={reward_event_type}&telegram_id={telegram_id}&estimated_price={estimated_price}`
+## 1. Supabase database
 
-Only a server-received `event_type=impression` and `reward_event_type=valued` can create the 5 KNV ledger event. Each `ymid` is credited once. The browser SDK callback is not treated as proof of payment. Check the Monetag dashboard's macro syntax and test an actual valued impression before launch.
+Create a free Supabase project at https://supabase.com/dashboard. The current Free plan includes 500 MB Postgres storage, but projects can pause after one week of inactivity. See https://supabase.com/pricing.
 
-## Telegram Stars and Telebot Creator
-The Mini App creates XTR invoice links for Silver 100 Stars, Gold 250 Stars and Diamond 500 Stars, each for 30 days. It opens invoices using Telegram WebApp `openInvoice`.
+In Supabase SQL Editor, run the full file database/supabase-schema.sql once.
 
-After Telebot Creator receives `successful_payment`, its server-side handler must POST to:
-`https://YOUR-NETLIFY-SITE.netlify.app/payment-confirm`
+From Project Settings → API, copy the Project URL and the server-side Secret API key. Set them in Netlify as SUPABASE_URL and SUPABASE_SECRET_KEY. Never put the secret key in frontend JavaScript. Do not use a publishable key in the Netlify functions.
 
-Headers:
-- `Content-Type: application/json`
-- `X-Kencoin-Payment-Secret: YOUR_PAYMENT_CONFIRM_SECRET`
+## 2. Netlify environment variables
 
-JSON fields:
-- `payload`: `successful_payment.invoice_payload`
-- `user_id`: `message.from.id`
-- `currency`: `successful_payment.currency`
-- `total_amount`: `successful_payment.total_amount`
-- `telegram_charge_id`: `successful_payment.telegram_payment_charge_id`
+Set these in the Kencoin Netlify site's environment settings:
 
-The endpoint checks the pending invoice, Telegram user, XTR currency, exact amount and unique Telegram charge. It uses conditional writes to stop two confirmations from activating the same invoice. The Telebot Creator handler must also validate `pre_checkout_query` and answer it within Telegram's 10-second limit. Do not replace the bot's existing Telebot Creator webhook with the Netlify webhook; Telegram allows one active webhook URL per bot.
+| Variable | Purpose |
+|---|---|
+| BOT_TOKEN | Token for @KencoinOfficialBot |
+| SUPABASE_URL | Supabase project URL |
+| SUPABASE_SECRET_KEY | Supabase server-side secret API key |
+| POSTBACK_SECRET | Random secret shared with Monetag |
+| PAYMENT_CONFIRM_SECRET | Random secret shared with Telebot Creator payment commands |
+| BOT_WEBHOOK_SECRET | Different random secret shared with the Telebot Creator referral command |
+| ADMIN_SECRET | Random secret for /admin.html |
 
-## Telegram identity and channel task
-- The API validates Telegram Mini App `initData` using the bot token.
-- The bot must be an administrator in `@NairaHackerAI_Official` to verify channel membership.
-- The official channel join task awards 10 KNV once per Telegram account.
+Use long, different random values for all four secrets. Do not commit real values. A blank template is in .env.example.
 
-## Referrals
-The Mini App can record a referral attribution when Telegram supplies the referring ID as the Mini App `start_param`. A plain bot deep link `https://t.me/KencoinOfficialBot?start=ID` first reaches the bot's `/start` handler; that handler must carry the ID into the Mini App launch parameter for attribution to register. The app currently tracks referral counts only. No referral KNV reward is issued because no referral reward amount has been approved.
+## 3. Telebot Creator payment integration
 
-## Approved values and UI rules
-- Daily bonus: 3 KNV, once per Lagos calendar day.
-- Monetag valued rewarded ad: 5 KNV.
-- Display conversion: 1 KNV = $0.01, an estimate only and not a promise of cash redemption.
-- Withdrawals remain visibly `WITHDRAWAL LOCKED` with `Open on the day. Keep accumulating KNV.`; no request is accepted while locked.
-- When withdrawals are enabled in the future, payout networks are USDT TRC20 and BEP20. Show the ₦2,000 service fee and actual network gas fee separately. Minimum amount, treasury funding and approval controls must be configured first.
+Do not replace the existing Telebot Creator webhook. Keep the existing Mini App launch/menu button. Add these variables to the bot's private .env settings:
 
-## Final deployment gate
-Do not merge this branch into `main` or deploy yet. First:
-1. Set the three Netlify environment variables.
-2. Configure the Monetag postback URL and test one valued and one non-valued ad.
-3. Add the `successful_payment` forwarding call and pre-checkout validation in Telebot Creator.
-4. Ensure the bot is admin in the official channel.
-5. Test authenticated profile, daily bonus duplicate protection, channel task, ad reward deduplication, Stars invoice/payment activation and withdrawal lock inside Telegram.
-6. Review the balance/reward economics: 5 KNV is $0.05 at the display rate, and actual Monetag proceeds can be lower.
+- KENCOIN_SITE_URL = your Netlify URL, without a trailing slash
+- PAYMENT_CONFIRM_SECRET = same value as Netlify
+- BOT_WEBHOOK_SECRET = same value as Netlify
 
-GitHub Actions runs JavaScript syntax checks on staging. A passing syntax check is not a live integration test.
+### Add command /handler_pre_checkout_query
+
+    payload = str(message.invoice_payload)
+    user_id = str(message.from_user.id)
+    valid_prefix = payload.startswith("kc_silver_") or payload.startswith("kc_gold_") or payload.startswith("kc_diamond_")
+
+    if message.currency != "XTR" or not valid_prefix:
+        bot.answerPreCheckoutQuery(message.id, False, error_message="Invalid Kencoin invoice.")
+    else:
+        try:
+            response = HTTP.post(
+                KENCOIN_SITE_URL + "/api/payment/precheckout",
+                json={
+                    "payload": payload,
+                    "user_id": user_id,
+                    "currency": message.currency,
+                    "total_amount": message.total_amount
+                },
+                headers={"x-kencoin-payment-secret": PAYMENT_CONFIRM_SECRET},
+                timeout=8
+            )
+            result = response.json()
+            if response.status_code == 200 and result.get("ok"):
+                bot.answerPreCheckoutQuery(message.id, True)
+            else:
+                bot.answerPreCheckoutQuery(message.id, False, error_message="This Kencoin invoice is invalid or expired. Please create a new invoice.")
+        except Exception:
+            bot.answerPreCheckoutQuery(message.id, False, error_message="Kencoin could not verify this invoice. Please try again.")
+
+Telegram requires the pre-checkout answer within 10 seconds. The API verifies the pending invoice, owner, XTR currency and exact Stars amount.
+
+### Add this at the TOP of the existing wildcard command *
+
+Do not delete any other existing wildcard-handler logic.
+
+    pay = message.get("successful_payment")
+    if pay:
+        payment_data = {
+            "payload": pay.invoice_payload,
+            "user_id": str(message.from_user.id),
+            "currency": pay.currency,
+            "total_amount": pay.total_amount,
+            "telegram_charge_id": pay.telegram_payment_charge_id
+        }
+        confirmed = False
+        for attempt in range(3):
+            try:
+                response = HTTP.post(
+                    KENCOIN_SITE_URL + "/payment-confirm",
+                    json=payment_data,
+                    headers={"x-kencoin-payment-secret": PAYMENT_CONFIRM_SECRET},
+                    timeout=20
+                )
+                result = response.json()
+                if response.status_code == 200 and result.get("ok"):
+                    confirmed = True
+                    break
+            except Exception:
+                pass
+        if confirmed:
+            bot.sendMessage("Payment verified. Your Kencoin membership is active.")
+        else:
+            bot.sendMessage("Telegram received your payment, but Kencoin activation is still being verified. Please contact support and include this charge ID: " + str(pay.telegram_payment_charge_id))
+
+The database confirms each Telegram charge idempotently. Do not activate VIP locally before the server confirms the successful_payment update.
+
+## 4. Telebot Creator referral integration
+
+Add this near the top of the existing /start command, before its welcome response. Keep the existing Mini App launch button/menu behaviour.
+
+    parts = str(message.text or "").split(maxsplit=1)
+    if len(parts) == 2:
+        referrer_id = parts[1].strip()
+        invitee_id = str(message.from_user.id)
+        if referrer_id.isdigit() and referrer_id != invitee_id:
+            try:
+                HTTP.post(
+                    KENCOIN_SITE_URL + "/api/referral/register-bot",
+                    json={
+                        "referrer_id": referrer_id,
+                        "invitee_id": invitee_id,
+                        "first_name": message.from_user.first_name,
+                        "username": message.from_user.username
+                    },
+                    headers={"x-kencoin-bot-secret": BOT_WEBHOOK_SECRET},
+                    timeout=8
+                )
+            except Exception:
+                pass
+
+Referral links use https://t.me/KencoinOfficialBot?start=TELEGRAM_USER_ID. No referral KNV is issued.
+
+## 5. Monetag
+
+The Mini App creates a unique server-side ad session before showing an ad. Configure this postback URL in Monetag, replacing the domain and secret:
+
+    https://YOUR-NETLIFY-SITE.netlify.app/monetag-postback?secret=YOUR_POSTBACK_SECRET&ymid={ymid}&zone_id={zone_id}&event_type={event_type}&reward_event_type={reward_event_type}&telegram_id={telegram_id}&estimated_price={estimated_price}
+
+Confirm the exact macro names supported by your Monetag dashboard for this zone. The endpoint accepts only zone 12287936, event_type=impression and reward_event_type=valued. non_valued earns nothing. Test one valued and one non-valued event before launch.
+
+## 6. Withdrawals
+
+While locked, the Mini App shows only:
+
+    WITHDRAWAL LOCKED
+    Open on the day. Keep accumulating KNV.
+
+The backend rejects withdrawal requests before 1 April 2027, Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
+
+The minimum withdrawal amount has not been approved. It is intentionally blank in kencoin_settings, so withdrawal requests remain disabled until the owner chooses a minimum. After that decision, run this in Supabase SQL Editor:
+
+    update public.kencoin_settings
+    set setting_value = 'YOUR_APPROVED_MINIMUM_KNV'
+    where setting_key = 'minimum_withdrawal_knv';
+
+The ₦2,000 service fee and actual network gas fee must be shown separately during payout review. The current workflow records and administers requests; it does not automatically send USDT. Admin must pay from a funded treasury wallet and record the transaction reference before marking a request paid.
+
+## 7. Channel permissions
+
+Make @KencoinOfficialBot an administrator of @NairaHackerAI_Official so getChatMember can reliably verify channel membership.
+
+## 8. Live tests required before deployment
+
+- Apply the Supabase schema and set all seven Netlify environment variables.
+- Confirm /api/me returns the authenticated Telegram user's profile.
+- Claim daily bonus twice: only one 3 KNV credit.
+- Verify channel join twice: only one 10 KNV credit.
+- Send one Monetag valued postback twice: only one 5 KNV credit.
+- Send a non-valued postback: zero KNV.
+- Create Silver, Gold and Diamond invoices and verify 100 / 250 / 500 XTR.
+- Test pre-checkout rejection for wrong user, amount, currency and expired invoice.
+- Complete a real Stars payment and confirm activation only after successful_payment reaches /payment-confirm.
+- Test referral attribution and duplicate referrals.
+- Confirm withdrawals are rejected while locked. After unlock, test address validation, configured minimum, insufficient balance, admin approval, rejection and paid transaction reference.
+- Check browser console and Netlify function logs.
+
+Syntax checks do not replace live integration tests. Do not deploy or merge until every required test passes.
