@@ -144,7 +144,7 @@ The Mini App creates a unique server-side ad session before showing an ad. Confi
 
     https://YOUR-NETLIFY-SITE.netlify.app/monetag-postback?secret=YOUR_POSTBACK_SECRET&ymid={ymid}&zone_id={zone_id}&event_type={event_type}&reward_event_type={reward_event_type}&telegram_id={telegram_id}&estimated_price={estimated_price}
 
-Confirm the exact macro names supported by your Monetag dashboard for this zone. The endpoint accepts only zone 12287936, event_type=impression and reward_event_type=valued. non_valued earns nothing. Test one valued and one non-valued event before launch.
+Confirm the exact macro names supported by your Monetag dashboard for this zone. The endpoint accepts Monetag impression or click events for zone 12287936. Only reward_event_type=valued earns 5 KNV, once per ymid; non_valued earns nothing. Monetag can send both impression and click for one ad show, so the same ymid is deduplicated. Test one valued and one non-valued event before launch.
 
 ## 6. Withdrawals
 
