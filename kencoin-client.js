@@ -110,25 +110,47 @@
     }
   };
 
+  function waitForMonetag(timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      const started = Date.now();
+      const check = () => {
+        if (typeof window.show_12287936 === "function") return resolve(window.show_12287936);
+        if (Date.now() - started >= timeoutMs) return reject(new Error("Monetag could not load. Check your connection and try again."));
+        setTimeout(check, 200);
+      };
+      check();
+    });
+  }
+
   window.watchAd = async function() {
     if (!auth()) return note("Open Kencoin inside Telegram first.");
-    const show = window.show_12287936;
-    if (typeof show !== "function") return note("Monetag is loading. Try again shortly.");
     const button = document.querySelector('[onclick="watchAd()"]');
     const status = document.getElementById("adstatus");
-    if (button) { button.disabled = true; button.textContent = "LOADING AD..."; }
+    if (button) { button.disabled = true; button.textContent = "CONNECTING TO AD..."; }
     try {
+      const show = await waitForMonetag();
+      if (status) status.textContent = "Preparing a secure rewarded ad session...";
       const session = await call("/ad/start", {});
-      await show({ type: "end", ymid: session.ymid, requestVar: "daily_reward" });
-      if (status) status.textContent = "Ad flow ended. Waiting for Monetag's server-side valued-event confirmation.";
-      note("Ad finished. The 5 KNV reward is credited only after Monetag confirms a valued event.");
-      setTimeout(window.loadKencoinProfile, 5000);
+      if (!session?.ymid) throw new Error("Could not create a secure ad session. Please try again.");
+      if (button) button.textContent = "SHOWING AD...";
+      const result = await show({ type: "end", ymid: session.ymid, requestVar: "daily_reward" });
+      if (result?.reward_event_type === "valued") {
+        if (status) status.textContent = "Monetag confirmed a valued ad. Verifying your wallet credit...";
+        note("Monetag confirmed the ad. Your 5 KNV wallet credit is being verified.");
+      } else if (result?.reward_event_type === "non_valued") {
+        if (status) status.textContent = "This ad was not valued, so no KNV reward was earned.";
+        note("Ad completed, but Monetag marked it as non-valued. No KNV was added.");
+      } else {
+        if (status) status.textContent = "Ad closed. Waiting for Monetag's server-side confirmation.";
+        note("Ad closed. Any reward will be added only after server verification.");
+      }
+      setTimeout(window.loadKencoinProfile, 2500);
+      setTimeout(window.loadKencoinProfile, 7000);
       setTimeout(window.loadKencoinProfile, 15000);
     } catch (error) {
-      if (status) status.textContent = "No verified ad event received yet. Monetag may retry its server postback.";
-      note(error.message || "Ad unavailable. Any reward will wait for Monetag's server confirmation.");
-      setTimeout(window.loadKencoinProfile, 15000);
-      setTimeout(window.loadKencoinProfile, 60000);
+      if (status) status.textContent = "Ad not verified. No KNV has been added.";
+      note(error.message || "Ad could not be verified. Please try again later.");
+      setTimeout(window.loadKencoinProfile, 5000);
     } finally {
       if (button) { button.disabled = false; button.textContent = "WATCH REWARDED AD"; }
     }
