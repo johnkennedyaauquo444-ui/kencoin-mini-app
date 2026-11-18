@@ -14,7 +14,7 @@ export default async req=>{
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers:{"access-control-allow-origin":"*","access-control-allow-headers":"authorization,content-type","access-control-allow-methods":"GET,POST,OPTIONS"}});
   const user=await telegramUser(req);
   if(!user?.id)return json({error:"Open Kencoin inside Telegram to continue."},401);
-  const url=new URL(req.url), route=url.pathname.replace(/^\/api\/?/,"").replace(/\/$/,"");
+  const url=new URL(req.url), route=url.pathname.replace(/^\/(?:api|\.netlify\/functions\/api)\/?/,"").replace(/\/$/,"");
   const pool=db(), client=await pool.connect();
   try{
     await client.query("BEGIN"); await ensureUser(client,user);
