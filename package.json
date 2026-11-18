@@ -1,12 +1,9 @@
 {
   "name": "kencoin-mini-app",
-  "version": "1.0.0",
-  "description": "Kencoin Telegram Mini App",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Kencoin Telegram Mini App with Netlify Functions and Supabase",
   "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "@netlify/blobs": "^10.5.0",
-    "express": "^4.21.2"
+    "check": "node --check kencoin-client.js && node --check netlify/functions/lib/db.mjs && node --check netlify/functions/api.mjs && node --check netlify/functions/payment-confirm.mjs && node --check netlify/functions/monetag-postback.mjs && node --check scripts/check-inline-js.mjs && node scripts/check-inline-js.mjs"
   }
 }
