@@ -26,7 +26,7 @@ export default async req=>{
     const ins=await client.query("UPDATE payments SET status='paid',telegram_charge_id=$2,paid_at=now() WHERE payload=$1 AND status='pending' RETURNING user_id,plan",[sp.invoice_payload,charge]);
     if(ins.rowCount){
      const days=30;
-     await client.query("UPDATE users SET membership=$2,membership_expires_at=GREATEST(COALESCE(membership_expires_at,now()),now())+($3||' days')::interval,updated_at=now() WHERE telegram_id=$1",[ins.rows[0].user_id,ins.rows[0].plan,days]);
+     await client.query("UPDATE users SET membership=$2,membership_expires_at=GREATEST(COALESCE(membership_expires_at,now()),now())+($3 * interval '1 day'),updated_at=now() WHERE telegram_id=$1",[ins.rows[0].user_id,ins.rows[0].plan,days]);
     }
    }
    await client.query("COMMIT");
