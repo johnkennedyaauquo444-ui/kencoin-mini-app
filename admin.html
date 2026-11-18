@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Kencoin Admin</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090b0e;color:#f5f3ed;font:14px Arial,sans-serif;padding:20px}.wrap{max-width:900px;margin:auto}.panel{background:#151a21;border:1px solid #39302a;border-radius:14px;padding:18px;margin:14px 0}h1,h2{color:#ffdf98}input,select,button{font:inherit;border-radius:8px;padding:11px;border:1px solid #55452a;background:#0d1218;color:#fff}input{width:100%;margin:6px 0 12px}button{cursor:pointer;background:#d6a342;color:#211707;font-weight:bold;margin:4px}button.danger{background:#442020;color:#ffdada}button:disabled{opacity:.5;cursor:not-allowed}.muted{color:#a5aab2;font-size:12px;line-height:1.6}.row{border-top:1px solid #333;padding:14px 0;display:grid;grid-template-columns:1fr auto;gap:12px}.status{color:#ffdf98}.message{padding:10px;background:#222;border-radius:8px;white-space:pre-wrap}.hidden{display:none}@media(max-width:600px){.row{grid-template-columns:1fr}}
+</style></head><body><main class="wrap"><h1>KENCOIN ADMIN</h1><p class="muted">Private withdrawal review. Keep the admin secret private. No payout is sent automatically.</p>
+<section class="panel"><label for="secret">Admin secret</label><input id="secret" type="password" autocomplete="off" placeholder="Enter ADMIN_SECRET"><button id="load">LOAD PENDING REQUESTS</button><p id="message" class="message">Waiting for admin authentication.</p></section>
+<section class="panel"><h2>Pending withdrawals</h2><div id="items" class="muted">No requests loaded.</div></section>
+<script>
+const secret=()=>document.getElementById("secret").value.trim();
+const message=t=>document.getElementById("message").textContent=t;
+async function request(method,body){
+ const r=await fetch("/api/admin/withdrawals"+(method==="GET"?"?status=pending":""),{method,headers:{"Content-Type":"application/json","x-kencoin-admin-secret":secret()},...(body?{body:JSON.stringify(body)}:{})});
+ const d=await r.json().catch(()=>({}));
+ if(!r.ok)throw new Error(d.error||"Admin request failed");
+ return d;
+}
+function render(rows){
+ const root=document.getElementById("items");root.replaceChildren();
+ if(!rows.length){root.textContent="No pending withdrawals.";return;}
+ for(const w of rows){
+  const card=document.createElement("div");card.className="row";
+  const info=document.createElement("div");
+  const lines=["Request: "+w.id,"Telegram ID: "+w.telegram_id,"Amount: "+w.amount+" KNV","Network: "+w.network.replace("_"," "),"Wallet: "+w.wallet_address,"Submitted: "+new Date(w.created_at).toLocaleString()];
+  info.textContent=lines.join("\n");
+  const actions=document.createElement("div");
+  const approve=document.createElement("button");approve.textContent="APPROVE";
+  approve.onclick=()=>review(w.id,"approved");
+  const reject=document.createElement("button");reject.textContent="REJECT";reject.className="danger";
+  reject.onclick=()=>{const note=prompt("Reason for rejection (optional):")||"";review(w.id,"rejected",note);};
+  actions.append(approve,reject);card.append(info,actions);root.append(card);
+ }
+}
+async function review(id,status,noteText){
+ try{
+  let tx="";
+  if(status==="approved") { if(!confirm("Approve and reserve this withdrawal for payout?"))return; }
+  if(status==="rejected" && !confirm("Reject this request and release its reserved balance?"))return;
+  if(status==="paid"){
+   tx=prompt("Enter the completed transaction reference:")||"";
+   if(!tx)return;
+  }
+  await request("POST",{withdrawal_id:id,status,admin_note:noteText||null,tx_reference:tx||null});
+  message("Withdrawal updated: "+status);
+  await load();
+ }catch(e){message(e.message);}
+}
+async function load(){
+ try{const d=await request("GET");render(d.withdrawals||[]);message("Loaded "+(d.withdrawals||[]).length+" pending request(s).");}
+ catch(e){message(e.message);}
+}
+document.getElementById("load").addEventListener("click",load);
+</script></main></body></html>
