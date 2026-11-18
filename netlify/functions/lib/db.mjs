@@ -1,6 +1,8 @@
 import { getStore } from "@netlify/blobs";
 import crypto from "node:crypto";
-const store = () => getStore("kencoin-immutable-ledger-v1");
+
+// Strong read-after-write consistency for the append-only event ledger.
+const store = () => getStore({ name: "kencoin-immutable-ledger-v1", consistency: "strong" });
 export const dataStore = store;
 export function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"content-type":"application/json; charset=utf-8","cache-control":"no-store"}});}
 export async function telegramUser(req){
@@ -14,12 +16,14 @@ export async function telegramUser(req){
  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return null;
  const authDate=Number(p.get("auth_date"));
  if(!authDate||Date.now()/1000-authDate>86400||authDate>Date.now()/1000+60)return null;
- try{return JSON.parse(p.get("user")||"null");}catch{return null;}
+ try{return {...JSON.parse(p.get("user")||"null"),start_param:p.get("start_param")||null};}catch{return null;}
 }
 export async function getJSON(key){return await store().get(key,{type:"json",consistency:"strong"});}
+export async function getWithMetadata(key){return await store().getWithMetadata(key,{type:"json",consistency:"strong"});}
 export async function putOnce(key,value){return await store().setJSON(key,value,{onlyIfNew:true});}
+export async function putIfMatch(key,value,etag){return await store().setJSON(key,value,{onlyIfMatch:etag});}
 export async function listJSON(prefix){
- const s=store(),listed=await s.list({prefix});
+ const listed=await store().list({prefix});
  const out=await Promise.all((listed.blobs||[]).map(async b=>({key:b.key,value:await getJSON(b.key)})));
  return out.filter(x=>x.value!==null);
 }
