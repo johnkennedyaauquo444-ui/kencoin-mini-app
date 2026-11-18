@@ -142,6 +142,13 @@ export default async req => {
       return json({ ...result, message: result.credited ? "10 KNV channel task credited." : "Channel task already claimed." });
     }
     if (route === "ad/start") {
+      // Monetag retries failed postbacks for up to ~38 hours. Keep sessions
+      // valid for 48 hours, then retire abandoned sessions before creating one.
+      await updateRows(
+        "kencoin_ad_sessions",
+        "telegram_id=eq." + id + "&status=eq.pending&created_at=lt." + encodeURIComponent(new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()),
+        { status: "ignored" }
+      );
       const ymid = "kc_" + id + "_" + newId();
       await insertRow("kencoin_ad_sessions", { ymid, telegram_id: id, zone_id: "12287936", status: "pending" });
       return json({ ymid });
