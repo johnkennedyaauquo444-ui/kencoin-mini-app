@@ -11,7 +11,7 @@ Do not merge this branch into main or deploy until the external services below a
 - Monetag zone 12287936: 2 KNV only after a server-side valued impression; duplicate postbacks do not pay twice.
 - Telegram Stars: Silver 100, Gold 250, Diamond 500 Stars, each for 30 days. Invoice checkout opens inside the Mini App.
 - Referral attribution is recorded once; no referral reward is issued because no reward amount has been approved.
-- USDT TRC20/BEP20 withdrawal requests, balance reservation, admin review and transaction-reference tracking. Withdrawals remain locked until 1 March 2027 at 00:00 Africa/Lagos time. The locked UI displays a live countdown to that date.
+- USDT TRC20/BEP20 withdrawal requests, balance reservation, admin review and transaction-reference tracking. Withdrawals remain locked until 1 March 2027 at 00:00 Africa/Lagos time. The locked UI displays only “WITHDRAWAL LOCKED” and “Open on the day. Keep accumulating KNV.”
 - Private admin review page at /admin.html.
 
 ## 1. Supabase database
@@ -148,7 +148,7 @@ Use Monetag's exact macro placeholders shown above when saving the postback for 
 
 ## 6. Withdrawals
 
-While locked, the Mini App shows WITHDRAWAL LOCKED, the message “Open on the day. Keep accumulating KNV.” and a live days/hours/minutes/seconds countdown. The backend rejects withdrawal requests before 1 March 2027, 00:00 Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
+While locked, the Mini App shows only “WITHDRAWAL LOCKED” and the supporting message “Open on the day. Keep accumulating KNV.” It does not show the unlock date or a countdown. The backend rejects withdrawal requests before 1 March 2027, 00:00 Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
 
 The minimum withdrawal amount has not been approved. It is intentionally blank in kencoin_settings, so withdrawal requests remain disabled until the owner chooses a minimum. After that decision, run this in Supabase SQL Editor:
 
