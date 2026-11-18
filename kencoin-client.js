@@ -24,6 +24,8 @@
       if (membership) membership.textContent = d.user.membership || "STANDARD";
       const history = document.getElementById("historyList");
       if (history) history.textContent = d.history.length ? d.history.map(x => new Date(x.created_at).toLocaleString()+" · "+x.description+" · "+x.amount+" KNV").join("\n") : "No activity yet.";
+      const referral = document.getElementById("referralLink");
+      if (referral && tg()?.initDataUnsafe?.user?.id) referral.dataset.owner = String(tg().initDataUnsafe.user.id);
     } catch(e) { note(e.message); }
   };
   window.requestAction = async function(action, data={}) {
@@ -42,13 +44,11 @@
     if (btn) {btn.disabled=true;btn.textContent="LOADING AD...";}
     try {
       const session = await call("/ad/start", {});
-      const result = await show({type:"end", ymid:session.ymid, requestVar:"daily_reward"});
-      if (result?.reward_event_type === "valued") {
-        note("Monetag confirmed your ad. Your 5 KNV reward is being credited.");
-        setTimeout(window.loadKencoinProfile, 2500);
-      } else {
-        note("This ad was not monetized. No KNV reward was added.");
-      }
+      await show({type:"end", ymid:session.ymid, requestVar:"daily_reward"});
+      const status=document.getElementById("adstatus");
+      if(status)status.textContent="Ad finished. Waiting for Monetag's secure server-side reward confirmation.";
+      note("Ad finished. Your 5 KNV is added only after Monetag confirms a valued impression.");
+      setTimeout(window.loadKencoinProfile, 5000);
     } catch(e) { note(e.message || "Ad unavailable or verification failed."); }
     finally {if(btn){btn.disabled=false;btn.textContent="WATCH REWARDED AD";}}
   };
@@ -57,19 +57,39 @@
     try {
       const d = await call("/payment/create", {plan});
       tg().openInvoice(d.invoice_link, status => {
-        if (status === "paid") {note("Payment received. Confirming membership...");setTimeout(window.loadKencoinProfile,2500);}
+        if (status === "paid") {note("Payment received. Waiting for verified membership activation...");setTimeout(window.loadKencoinProfile,3000);}
         else if (status === "cancelled") note("Payment cancelled. No membership activated.");
         else if (status === "failed") note("Payment failed. Please try again.");
       });
     } catch(e) {note(e.message);}
   };
-  window.addEventListener("load", () => {
+  window.invite = async function() {
+    const user=tg()?.initDataUnsafe?.user;
+    if(!user?.id)return note("Open Kencoin inside Telegram first.");
+    const link="https://t.me/KencoinOfficialBot?start="+user.id;
+    const target=document.getElementById("referralLink");
+    if(target)target.textContent=link;
+    try{
+      const stats=await call("/referral/stats");
+      const count=stats.count||0;
+      note("Your invite link is ready. Verified referrals: "+count+". Referral rewards are not enabled yet.");
+    }catch(e){note("Your invite link is ready. "+e.message);}
+    const share="https://t.me/share/url?url="+encodeURIComponent(link);
+    if(tg()?.openTelegramLink)tg().openTelegramLink(share);
+    else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(link);note("Referral link copied.");}
+  };
+  window.addEventListener("load", async () => {
     const tasks = document.querySelector("#tasks .panel");
     if (tasks && !document.getElementById("verifyChannelTask")) {
       const b = document.createElement("button");
       b.id="verifyChannelTask";b.className="btn secondary";b.textContent="VERIFY CHANNEL JOIN · 10 KNV";
       b.onclick=()=>window.requestAction("task/channel");
       tasks.appendChild(b);
+    }
+    const startParam=tg()?.initDataUnsafe?.start_param;
+    const me=tg()?.initDataUnsafe?.user?.id;
+    if(startParam&&me&&/^\d{3,20}$/.test(String(startParam))&&String(startParam)!==String(me)){
+      try{await call("/referral/register",{referrer_id:String(startParam)});}catch(e){/* no reward is issued from a referral link alone */}
     }
     window.loadKencoinProfile();
   });
