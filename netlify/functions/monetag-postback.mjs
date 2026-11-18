@@ -23,6 +23,7 @@ export default async req => {
     });
     return new Response(result.credited ? "Reward credited" : "Duplicate ignored", { status: 200 });
   } catch (error) {
-    return new Response("Postback processing failed: " + (error.message || "unknown error"), { status: 500 });
+    console.error("[Kencoin Monetag postback]", error.message || error);
+    return new Response("Postback processing failed", { status: 500 });
   }
 };
