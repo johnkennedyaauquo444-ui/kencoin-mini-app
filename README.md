@@ -1,1 +1,0 @@
-# kencoin-mini-app
