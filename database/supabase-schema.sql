@@ -90,7 +90,7 @@ revoke all on public.kencoin_profiles, public.kencoin_ledger, public.kencoin_inv
 create or replace function public.kencoin_claim_reward(
   p_telegram_id bigint, p_amount integer, p_entry_type text,
   p_reference text, p_description text, p_metadata jsonb default '{}'::jsonb
-) returns jsonb language plpgsql security definer set search_path=public as $$
+) returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare inserted_count integer; current_balance bigint;
 begin
   if p_amount <= 0 or p_amount > 10000 then raise exception 'invalid_reward_amount'; end if;
@@ -103,7 +103,7 @@ begin
 end $$;
 
 create or replace function public.kencoin_credit_ad(p_ymid text,p_telegram_id bigint,p_estimated_price text)
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare changed integer; result jsonb;
 begin
   update kencoin_ad_sessions set status='rewarded',verified_at=now()
@@ -116,14 +116,15 @@ end $$;
 
 create or replace function public.kencoin_confirm_stars(
   p_payload text,p_telegram_id bigint,p_currency text,p_total_amount integer,p_charge_id text
-) returns jsonb language plpgsql security definer set search_path=public as $$
+) returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare inv kencoin_invoices%rowtype; last_expiry timestamptz; new_expiry timestamptz;
 begin
   select * into inv from kencoin_invoices where payload=p_payload for update;
   if not found then raise exception 'unknown_invoice'; end if;
-  if inv.telegram_id<>p_telegram_id or split_part(p_payload,'_',2)<>inv.plan or split_part(p_payload,'_',3)<>p_telegram_id::text then raise exception 'invoice_user_mismatch'; end if;
+  if inv.telegram_id is distinct from p_telegram_id or split_part(p_payload,'_',2) is distinct from inv.plan or split_part(p_payload,'_',3) is distinct from p_telegram_id::text then raise exception 'invoice_user_mismatch'; end if;
   if inv.created_at < now() - interval '24 hours' then raise exception 'invoice_expired'; end if;
-  if p_currency<>'XTR' or p_total_amount<>inv.stars then raise exception 'payment_amount_or_currency_mismatch'; end if;
+  if p_currency is distinct from 'XTR' or p_total_amount is distinct from inv.stars then raise exception 'payment_amount_or_currency_mismatch'; end if;
+  if coalesce(p_charge_id,'')='' then raise exception 'missing_telegram_charge_id'; end if;
   if exists(select 1 from kencoin_invoices where telegram_charge_id=p_charge_id and payload<>p_payload) then raise exception 'charge_already_used'; end if;
   if inv.status='paid' then
     if inv.telegram_charge_id=p_charge_id then return jsonb_build_object('ok',true,'duplicate',true,'plan',inv.plan,'expires_at',inv.expires_at); end if;
@@ -137,7 +138,7 @@ begin
 end $$;
 
 create or replace function public.kencoin_register_referral(p_invitee bigint,p_referrer bigint)
-returns jsonb language plpgsql security definer set search_path=public as $$
+returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare inserted_count integer;
 begin
   if p_invitee=p_referrer then raise exception 'self_referral_not_allowed'; end if;
@@ -149,7 +150,7 @@ end $$;
 
 create or replace function public.kencoin_create_withdrawal(
   p_telegram_id bigint,p_amount integer,p_network text,p_wallet_address text
-) returns jsonb language plpgsql security definer set search_path=public as $$
+) returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare min_amount integer; current_balance bigint; reserved bigint; new_id uuid;
 begin
   if now() < timestamptz '2027-04-01 00:00:00+01' then raise exception 'withdrawals_locked'; end if;
@@ -168,7 +169,7 @@ end $$;
 
 create or replace function public.kencoin_review_withdrawal(
   p_withdrawal_id uuid,p_status text,p_admin_note text default null,p_tx_reference text default null
-) returns jsonb language plpgsql security definer set search_path=public as $$
+) returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $
 declare w kencoin_withdrawals%rowtype;
 begin
   select * into w from kencoin_withdrawals where id=p_withdrawal_id for update;
