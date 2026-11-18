@@ -30,9 +30,12 @@ async function withdrawalInfo(id) {
   const locked = Date.now() < WITHDRAWAL_UNLOCK;
   const settings = await selectRows("kencoin_settings", "select=setting_value&setting_key=eq.minimum_withdrawal_knv&limit=1");
   const minimum = Number(settings[0]?.setting_value || 0) || null;
-  const rows = await selectRows("kencoin_withdrawals", "select=id,amount,network,wallet_address,status,admin_note,tx_reference,created_at,reviewed_at,paid_at&telegram_id=eq." + id + "&order=created_at.desc&limit=50");
-  const balance = await balanceFor(id);
-  const reserved = rows.filter(x => ["pending","approved"].includes(x.status)).reduce((sum,x) => sum + Number(x.amount),0);
+  const [rows, reservedRows, balance] = await Promise.all([
+    selectRows("kencoin_withdrawals", "select=id,amount,network,wallet_address,status,admin_note,tx_reference,created_at,reviewed_at,paid_at&telegram_id=eq." + id + "&order=created_at.desc&limit=50"),
+    selectRows("kencoin_withdrawals", "select=amount&telegram_id=eq." + id + "&status=in.(pending,approved)"),
+    balanceFor(id)
+  ]);
+  const reserved = reservedRows.reduce((sum,x) => sum + Number(x.amount),0);
   return { locked, minimum, balance, available_balance: balance - reserved, history: rows };
 }
 function validWallet(network, address) {
