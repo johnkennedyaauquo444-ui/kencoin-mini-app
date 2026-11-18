@@ -78,9 +78,9 @@ export default async req => {
       const payload = String(body.payload || ""), userId = String(body.user_id || "");
       const currency = String(body.currency || ""), total = Number(body.total_amount);
       if (!/^kc_(silver|gold|diamond)_\d{3,20}_[A-Za-z0-9]+$/.test(payload) || payload.split("_")[2] !== userId || currency !== "XTR") return json({ ok: false, error: "Invalid invoice details." }, 400);
-      const invoices = await selectRows("kencoin_invoices", "select=telegram_id,stars,status&payload=eq." + encodeURIComponent(payload) + "&limit=1");
+      const invoices = await selectRows("kencoin_invoices", "select=telegram_id,plan,stars,status,created_at&payload=eq." + encodeURIComponent(payload) + "&limit=1");
       const invoice = invoices[0];
-      if (!invoice || String(invoice.telegram_id) !== userId || invoice.status !== "pending" || Number(invoice.stars) !== total) return json({ ok: false, error: "Invoice is not valid for this account or amount." }, 403);
+      if (!invoice || String(invoice.telegram_id) !== userId || invoice.plan !== payload.split("_")[1] || invoice.status !== "pending" || Number(invoice.stars) !== total || Date.now() - Date.parse(invoice.created_at) > 24 * 60 * 60 * 1000) return json({ ok: false, error: "Invoice is not valid for this account or amount." }, 403);
       return json({ ok: true });
     }
     if (route === "referral/register-bot") {
