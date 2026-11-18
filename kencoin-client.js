@@ -136,7 +136,7 @@
       const result = await show({ type: "end", ymid: session.ymid, requestVar: "daily_reward" });
       if (result?.reward_event_type === "valued") {
         if (status) status.textContent = "Monetag confirmed a valued ad. Verifying your wallet credit...";
-        note("Monetag confirmed the ad. Your 5 KNV wallet credit is being verified.");
+        note("Monetag confirmed the ad. Your 2 KNV wallet credit is being verified.");
       } else if (result?.reward_event_type === "non_valued") {
         if (status) status.textContent = "This ad was not valued, so no KNV reward was earned.";
         note("Ad completed, but Monetag marked it as non-valued. No KNV was added.");
