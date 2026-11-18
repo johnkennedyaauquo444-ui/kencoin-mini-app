@@ -30,6 +30,18 @@ export async function rpc(name, args) {
 export async function selectRows(table, query = "") {
   return dbRequest(table + (query ? "?" + query : ""), { method: "GET" });
 }
+export async function selectAllRows(table, query = "", pageSize = 1000) {
+  const rows = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await dbRequest(table + (query ? "?" + query : ""), {
+      method: "GET",
+      headers: { "Range-Unit": "items", Range: offset + "-" + (offset + pageSize - 1) }
+    });
+    if (!Array.isArray(page)) throw new Error("Expected a row list from " + table + ".");
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
 export async function insertRow(table, value, query = "", prefer = "return=representation") {
   return dbRequest(table + (query ? "?" + query : ""), { method: "POST", body: JSON.stringify(value), headers: { Prefer: prefer } });
 }
