@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#090b0e">
 <title>KENCOIN | Premium Rewards</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://libtl.com/sdk.js" data-zone="12287936" data-sdk="show_12287936"></script>
 <style>
 :root {
   --bg:#090b0e;
@@ -346,13 +347,38 @@ async function requestAction(action,data={}){
 }
 
 async function watchAd(){
-  if(!API_BASE){
-    document.getElementById('adstatus').textContent=
-      'Monetag Zone '+MONETAG_ZONE_ID+' is reserved. Server-side verification must be connected before rewards can be issued.';
-    notify('Ad rewards are not active yet.');
+  if(!tg?.initData || !user?.id){
+    notify('Open Kencoin inside Telegram first.');
     return;
   }
-  await requestAction('ad/start',{zone_id:MONETAG_ZONE_ID});
+  const showAd = window['show_'+MONETAG_ZONE_ID];
+  if(typeof showAd !== 'function'){
+    notify('Monetag is still loading. Please try again in a moment.');
+    return;
+  }
+  const button = document.querySelector('[onclick="watchAd()"]');
+  if(button){ button.disabled=true; button.textContent='LOADING AD...'; }
+  const randomPart = (window.crypto?.randomUUID?.() || (Date.now()+'_'+Math.random().toString(36).slice(2))).replace(/[^A-Za-z0-9_.-]/g,'');
+  const ymid = 'kc_'+user.id+'_'+randomPart;
+  document.getElementById('adstatus').textContent='Connecting to Monetag...';
+  try{
+    const result = await showAd({type:'end',ymid,requestVar:'daily_reward'});
+    if(result?.reward_event_type === 'valued'){
+      document.getElementById('adstatus').textContent='Monetag confirmed a valued ad event. Wallet credit still depends on secure server ledger verification.';
+      notify('Ad verified by Monetag. Wallet credit is pending server ledger processing.');
+    }else if(result?.reward_event_type === 'non_valued'){
+      document.getElementById('adstatus').textContent='This ad was not monetized. No KNV reward is due.';
+      notify('This ad was not monetized. No reward earned.');
+    }else{
+      document.getElementById('adstatus').textContent='Ad flow ended. Waiting for the server-side verification record.';
+      notify('Ad flow ended. Reward is not yet confirmed.');
+    }
+  }catch(error){
+    document.getElementById('adstatus').textContent='No verified ad event received. Please try again later.';
+    notify('Ad unavailable or verification failed. No reward was added.');
+  }finally{
+    if(button){ button.disabled=false; button.textContent='WATCH REWARDED AD'; }
+  }
 }
 
 async function buyPlan(plan){
@@ -372,7 +398,7 @@ function invite(){
     notify('Open Kencoin through Telegram first.');
     return;
   }
-  const link='https://t.me/KencoinBot?start='+user.id;
+  const link='https://t.me/KencoinOfficialBot?start='+user.id;
   document.getElementById('referralLink').textContent=link;
   const share='https://t.me/share/url?url='+encodeURIComponent(link);
   if(tg?.openTelegramLink){
