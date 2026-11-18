@@ -20,7 +20,7 @@ Create a free Supabase project at https://supabase.com/dashboard. The current Fr
 
 In Supabase SQL Editor, run the full file database/supabase-schema.sql once.
 
-From Project Settings → API, copy the Project URL and the server-side Secret API key. Set them in Netlify as SUPABASE_URL and SUPABASE_SECRET_KEY. Never put the secret key in frontend JavaScript. Do not use a publishable key in the Netlify functions.
+From Project Settings → API Keys (or the Connect dialog), copy the Project URL and the server-side Secret API key. Set them in Netlify as SUPABASE_URL and SUPABASE_SECRET_KEY. Never put the secret key in frontend JavaScript. Do not use a publishable key in the Netlify functions.
 
 ## 2. Netlify environment variables
 
