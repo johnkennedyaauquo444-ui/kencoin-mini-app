@@ -123,6 +123,20 @@ export default async req => {
       if (!/^\d{3,20}$/.test(referrer) || referrer === id) return json({ error: "Invalid referral link." }, 400);
       return json(await rpc("kencoin_register_referral", { p_invitee: id, p_referrer: referrer }));
     }
+    if (route === "payment/precheckout") {
+      const payload = String(body.payload || "");
+      const currency = String(body.currency || "");
+      const total = Number(body.total_amount);
+      if (!/^kc_(silver|gold|diamond)_\\d{3,20}_[A-Za-z0-9]+$/.test(payload) || currency !== "XTR") {
+        return json({ ok: false, error: "Invalid invoice details." }, 400);
+      }
+      const invoices = await selectRows("kencoin_invoices", "select=telegram_id,plan,stars,status&payload=eq." + encodeURIComponent(payload) + "&limit=1");
+      const invoice = invoices[0];
+      if (!invoice || String(invoice.telegram_id) !== id || invoice.status !== "pending" || Number(invoice.stars) !== total) {
+        return json({ ok: false, error: "Invoice is not valid for this account or amount." }, 403);
+      }
+      return json({ ok: true });
+    }
     if (route === "payment/create") {
       const plan = PLANS[body.plan];
       if (!plan) return json({ error: "Invalid membership plan." }, 400);
