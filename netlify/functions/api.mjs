@@ -1,4 +1,4 @@
-import { json, telegramUser, rpc, selectRows, insertRow, upsertRow, updateRows, newId, sameSecret } from "./lib/db.mjs";
+import { json, telegramUser, rpc, selectRows, selectAllRows, insertRow, upsertRow, updateRows, newId, sameSecret } from "./lib/db.mjs";
 
 const BOT_API = "https://api.telegram.org/bot";
 const PLANS = { silver: { stars: 100 }, gold: { stars: 250 }, diamond: { stars: 500 } };
@@ -23,7 +23,7 @@ async function ensureProfile(user) {
   }, "telegram_id");
 }
 async function balanceFor(id) {
-  const rows = await selectRows("kencoin_ledger", "select=amount&telegram_id=eq." + id);
+  const rows = await selectAllRows("kencoin_ledger", "select=amount&telegram_id=eq." + id);
   return rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
 }
 async function withdrawalInfo(id) {
