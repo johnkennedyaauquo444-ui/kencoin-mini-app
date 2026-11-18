@@ -47,8 +47,10 @@
     const amount = document.getElementById("withdrawalAmount");
     const submit = document.getElementById("withdrawalSubmit");
     const history = document.getElementById("withdrawalHistory");
+    const historyPanel = document.getElementById("withdrawalHistoryPanel");
     if (locked) locked.hidden = !data.locked;
     if (panel) panel.hidden = !!data.locked;
+    if (historyPanel) historyPanel.hidden = !!data.locked;
     if (available) available.textContent = "Available balance: " + Number(data.available_balance || 0).toLocaleString() + " KNV";
     if (amount && data.minimum) amount.min = String(data.minimum);
     if (minimum) minimum.textContent = data.minimum ? "Minimum request: " + Number(data.minimum).toLocaleString() + " KNV." : "Withdrawal minimum is not configured yet. Requests are disabled.";
