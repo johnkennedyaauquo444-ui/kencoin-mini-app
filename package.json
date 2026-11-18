@@ -1,14 +1,9 @@
-
 {
   "name": "kencoin-mini-app",
   "version": "1.0.0",
-  "description": "Kencoin Telegram Mini App backend",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "description": "Kencoin Telegram Mini App",
+  "scripts": {},
   "dependencies": {
-    "express": "^5.1.0"
+    "@netlify/blobs": "^10.5.0"
   }
 }
-
