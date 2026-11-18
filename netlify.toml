@@ -19,3 +19,8 @@
   from = "/monetag-postback"
   to = "/.netlify/functions/monetag-postback"
   status = 200
+
+[[redirects]]
+  from = "/payment-confirm"
+  to = "/.netlify/functions/payment-confirm"
+  status = 200
