@@ -235,8 +235,7 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
   <div class="lock" id="withdrawalLocked">
     <small>WITHDRAWAL STATUS</small>
     <h3>WITHDRAWAL LOCKED</h3>
-    <p>Withdrawals open on 1 March 2027. Keep accumulating KNV.</p>
-    <div class="countdown" id="withdrawalCountdown" role="timer" aria-live="off">Loading countdown…</div>
+    <p>Open on the day. Keep accumulating KNV.</p>
   </div>
   <div class="panel" id="withdrawalPanel" hidden>
     <h3>Request USDT withdrawal</h3>
@@ -325,20 +324,6 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
 const tg=window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
-function updateWithdrawalCountdown(){
-  const target=document.getElementById('withdrawalCountdown');
-  if(!target)return;
-  const opensAt=new Date('2027-03-01T00:00:00+01:00').getTime();
-  const remaining=opensAt-Date.now();
-  if(remaining<=0){target.textContent='Opening day has arrived';return;}
-  const days=Math.floor(remaining/86400000);
-  const hours=Math.floor((remaining%86400000)/3600000);
-  const minutes=Math.floor((remaining%3600000)/60000);
-  const seconds=Math.floor((remaining%60000)/1000);
-  target.innerHTML=`<div><b>${days}</b><span>DAYS</span></div><div><b>${String(hours).padStart(2,'0')}</b><span>HOURS</span></div><div><b>${String(minutes).padStart(2,'0')}</b><span>MINUTES</span></div><div><b>${String(seconds).padStart(2,'0')}</b><span>SECONDS</span></div>`;
-}
-updateWithdrawalCountdown();
-setInterval(updateWithdrawalCountdown,1000);
 const user=tg?.initDataUnsafe?.user;
 document.getElementById('username').textContent=user?.first_name||'Member';
 function notify(message){
