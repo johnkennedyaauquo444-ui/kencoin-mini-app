@@ -110,7 +110,7 @@ begin
   where ymid=p_ymid and telegram_id=p_telegram_id and status='pending';
   get diagnostics changed = row_count;
   if changed=0 then return jsonb_build_object('credited',false,'reason','duplicate_or_unknown'); end if;
-  result := kencoin_claim_reward(p_telegram_id,5,'monetag_reward','monetag-'||p_ymid,'Verified Monetag rewarded ad',jsonb_build_object('ymid',p_ymid,'estimated_price',p_estimated_price));
+  result := kencoin_claim_reward(p_telegram_id,2,'monetag_reward','monetag-'||p_ymid,'Verified Monetag rewarded ad',jsonb_build_object('ymid',p_ymid,'estimated_price',p_estimated_price));
   return result;
 end $$;
 
