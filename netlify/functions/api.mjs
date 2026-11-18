@@ -3,7 +3,7 @@ import { json, telegramUser, rpc, selectRows, selectAllRows, insertRow, upsertRo
 const BOT_API = "https://api.telegram.org/bot";
 const PLANS = { silver: { stars: 100 }, gold: { stars: 250 }, diamond: { stars: 500 } };
 const CHANNEL = "@NairaHackerAI_Official";
-const WITHDRAWAL_UNLOCK = Date.parse("2027-04-01T00:00:00+01:00");
+const WITHDRAWAL_UNLOCK = Date.parse("2027-03-01T00:00:00+01:00");
 
 async function telegram(method, body) {
   const token = process.env.BOT_TOKEN;
