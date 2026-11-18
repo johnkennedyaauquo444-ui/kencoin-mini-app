@@ -8,7 +8,7 @@ Do not merge this branch into main or deploy until the external services below a
 - Supabase Postgres transactional wallet ledger.
 - Daily bonus: 3 KNV once per Lagos calendar day.
 - Verified official-channel join: 10 KNV once.
-- Monetag zone 12287936: 5 KNV only after a server-side valued impression; duplicate postbacks do not pay twice.
+- Monetag zone 12287936: 2 KNV only after a server-side valued impression; duplicate postbacks do not pay twice.
 - Telegram Stars: Silver 100, Gold 250, Diamond 500 Stars, each for 30 days. Invoice checkout opens inside the Mini App.
 - Referral attribution is recorded once; no referral reward is issued because no reward amount has been approved.
 - USDT TRC20/BEP20 withdrawal requests, balance reservation, admin review and transaction-reference tracking. Withdrawals remain locked until 1 March 2027 at 00:00 Africa/Lagos time. The locked UI displays a live countdown to that date.
@@ -144,11 +144,11 @@ The Mini App creates a unique server-side ad session before showing an ad. Confi
 
     https://charming-peony-faa6f9.netlify.app/monetag-postback?secret=YOUR_POSTBACK_SECRET&ymid={ymid}&zone_id={zone_id}&sub_zone_id={sub_zone_id}&event_type={event_type}&reward_event_type={reward_event_type}&request_var={request_var}&telegram_id={telegram_id}&estimated_price={estimated_price}
 
-Use Monetag's exact macro placeholders shown above when saving the postback for the main SDK zone. The endpoint validates the main zone, event type, user/session match and 48-hour session window; sub-zone and placement values are included for reporting. The endpoint accepts Monetag impression or click events for zone 12287936. Only reward_event_type=valued earns 5 KNV, once per ymid; non_valued earns nothing. Monetag can send both impression and click for one ad show, so the same ymid is deduplicated. Test one valued and one non-valued event before launch.
+Use Monetag's exact macro placeholders shown above when saving the postback for the main SDK zone. The endpoint validates the main zone, event type, user/session match and 48-hour session window; sub-zone and placement values are included for reporting. The endpoint accepts Monetag impression or click events for zone 12287936. Only reward_event_type=valued earns 2 KNV, once per ymid; non_valued earns nothing. Monetag can send both impression and click for one ad show, so the same ymid is deduplicated. Test one valued and one non-valued event before launch.
 
 ## 6. Withdrawals
 
-While locked, the Mini App shows WITHDRAWAL LOCKED, the message “Withdrawals open on 1 March 2027. Keep accumulating KNV.” and a live days/hours/minutes/seconds countdown. The backend rejects withdrawal requests before 1 March 2027, 00:00 Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
+While locked, the Mini App shows WITHDRAWAL LOCKED, the message “Open on the day. Keep accumulating KNV.” and a live days/hours/minutes/seconds countdown. The backend rejects withdrawal requests before 1 March 2027, 00:00 Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
 
 The minimum withdrawal amount has not been approved. It is intentionally blank in kencoin_settings, so withdrawal requests remain disabled until the owner chooses a minimum. After that decision, run this in Supabase SQL Editor:
 
@@ -168,7 +168,7 @@ Make @KencoinOfficialBot an administrator of @NairaHackerAI_Official so getChatM
 - Confirm /api/me returns the authenticated Telegram user's profile.
 - Claim daily bonus twice: only one 3 KNV credit.
 - Verify channel join twice: only one 10 KNV credit.
-- Send one Monetag valued postback twice: only one 5 KNV credit.
+- Send one Monetag valued postback twice: only one 2 KNV credit.
 - Send a non-valued postback: zero KNV.
 - Create Silver, Gold and Diamond invoices and verify 100 / 250 / 500 XTR.
 - Test pre-checkout rejection for wrong user, amount, currency and expired invoice.
