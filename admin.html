@@ -8,8 +8,8 @@
 <script>
 const secret=()=>document.getElementById("secret").value.trim();
 const message=t=>document.getElementById("message").textContent=t;
-async function request(method,body){
- const r=await fetch("/api/admin/withdrawals"+(method==="GET"?"?status=pending":""),{method,headers:{"Content-Type":"application/json","x-kencoin-admin-secret":secret()},...(body?{body:JSON.stringify(body)}:{})});
+async function request(method,body,status="pending"){
+ const r=await fetch("/api/admin/withdrawals"+(method==="GET"?"?status="+encodeURIComponent(status):""),{method,headers:{"Content-Type":"application/json","x-kencoin-admin-secret":secret()},...(body?{body:JSON.stringify(body)}:{})});
  const d=await r.json().catch(()=>({}));
  if(!r.ok)throw new Error(d.error||"Admin request failed");
  return d;
@@ -23,11 +23,15 @@ function render(rows){
   const lines=["Request: "+w.id,"Telegram ID: "+w.telegram_id,"Amount: "+w.amount+" KNV","Network: "+w.network.replace("_"," "),"Wallet: "+w.wallet_address,"Submitted: "+new Date(w.created_at).toLocaleString()];
   info.textContent=lines.join("\n");
   const actions=document.createElement("div");
-  const approve=document.createElement("button");approve.textContent="APPROVE";
-  approve.onclick=()=>review(w.id,"approved");
+  if(w.status==="pending"){
+   const approve=document.createElement("button");approve.textContent="APPROVE";approve.onclick=()=>review(w.id,"approved");actions.append(approve);
+  }
+  if(w.status==="approved"){
+   const paid=document.createElement("button");paid.textContent="MARK AS PAID";paid.onclick=()=>review(w.id,"paid");actions.append(paid);
+  }
   const reject=document.createElement("button");reject.textContent="REJECT";reject.className="danger";
   reject.onclick=()=>{const note=prompt("Reason for rejection (optional):")||"";review(w.id,"rejected",note);};
-  actions.append(approve,reject);card.append(info,actions);root.append(card);
+  actions.append(reject);card.append(info,actions);root.append(card);
  }
 }
 async function review(id,status,noteText){
@@ -45,7 +49,7 @@ async function review(id,status,noteText){
  }catch(e){message(e.message);}
 }
 async function load(){
- try{const d=await request("GET");render(d.withdrawals||[]);message("Loaded "+(d.withdrawals||[]).length+" pending request(s).");}
+ try{const pending=await request("GET",null,"pending");const approved=await request("GET",null,"approved");const rows=[...(pending.withdrawals||[]),...(approved.withdrawals||[])];render(rows);message("Loaded "+rows.length+" request(s): "+(pending.withdrawals||[]).length+" pending, "+(approved.withdrawals||[]).length+" approved.");}
  catch(e){message(e.message);}
 }
 document.getElementById("load").addEventListener("click",load);
