@@ -20,6 +20,10 @@ export default async req=>{
    const membership=active&&new Date(active.expires_at)>new Date()?active.plan.toUpperCase():"STANDARD";
    return json({user:{telegram_id:String(user.id),balance,membership,membership_expires_at:active?.expires_at||null},history,usd_equivalent:(balance/100).toFixed(2)});
   }
+  if(req.method==="GET"&&route==="referral/stats"){
+   const referrals=await listJSON("referrals/invitee/");
+   return json({count:referrals.filter(x=>x.value.referrer_id===String(user.id)).length,reward_amount:0,message:"Referral rewards are not enabled until a reward amount is approved."});
+  }
   if(req.method!=="POST")return json({error:"Method not allowed"},405);
   const body=await req.json().catch(()=>({}));
   if(route==="daily_bonus"){
@@ -47,10 +51,6 @@ export default async req=>{
    if(existing)return json({ok:true,already_registered:true});
    const saved=await putOnce("referrals/invitee/"+user.id,{invitee_id:String(user.id),referrer_id:referrer,created_at:new Date().toISOString()});
    return json({ok:saved.modified,already_registered:!saved.modified});
-  }
-  if(route==="referral/stats"){
-   const referrals=await listJSON("referrals/invitee/");
-   return json({count:referrals.filter(x=>x.value.referrer_id===String(user.id)).length,reward_amount:0,message:"Referral rewards are not enabled until a reward amount is approved."});
   }
   if(route==="payment/create"){
    const plan=PLANS[body.plan];if(!plan)return json({error:"Invalid membership plan."},400);
