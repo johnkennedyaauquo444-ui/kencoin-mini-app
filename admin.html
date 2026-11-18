@@ -20,7 +20,7 @@ function render(rows){
  for(const w of rows){
   const card=document.createElement("div");card.className="row";
   const info=document.createElement("div");
-  const lines=["Request: "+w.id,"Telegram ID: "+w.telegram_id,"Amount: "+w.amount+" KNV","Network: "+w.network.replace("_"," "),"Wallet: "+w.wallet_address,"Submitted: "+new Date(w.created_at).toLocaleString()];
+  const lines=["Request: "+w.id,"Telegram ID: "+w.telegram_id,"Amount: "+w.amount+" KNV","Indicative gross: $"+(Number(w.amount)/100).toFixed(2)+" USDT (display estimate)","Fees: ₦2,000 service fee + actual network gas separately","Network: "+w.network.replace("_"," "),"Wallet: "+w.wallet_address,"Submitted: "+new Date(w.created_at).toLocaleString()];
   info.textContent=lines.join("\n");
   const actions=document.createElement("div");
   if(w.status==="pending"){
