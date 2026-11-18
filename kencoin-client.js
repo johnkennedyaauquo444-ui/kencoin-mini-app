@@ -125,8 +125,10 @@
       setTimeout(window.loadKencoinProfile, 5000);
       setTimeout(window.loadKencoinProfile, 15000);
     } catch (error) {
-      if (status) status.textContent = "No verified ad event received. Please try again later.";
-      note(error.message || "Ad unavailable. No reward was added.");
+      if (status) status.textContent = "No verified ad event received yet. Monetag may retry its server postback.";
+      note(error.message || "Ad unavailable. Any reward will wait for Monetag's server confirmation.");
+      setTimeout(window.loadKencoinProfile, 15000);
+      setTimeout(window.loadKencoinProfile, 60000);
     } finally {
       if (button) { button.disabled = false; button.textContent = "WATCH REWARDED AD"; }
     }
