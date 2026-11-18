@@ -120,6 +120,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:10p
 .lock small{color:#d9bd82;letter-spacing:1.5px;font-size:9px}
 .lock h3{color:var(--gold2);margin:9px 0}
 .lock p{font-size:11px;color:#c9b98f;margin:0}
+.countdown{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:15px}
+.countdown div{background:#100e0a;border:1px solid #80632e;border-radius:10px;padding:10px 4px;text-align:center}
+.countdown b{display:block;color:var(--gold2);font-size:18px;font-variant-numeric:tabular-nums}
+.countdown span{display:block;color:#c9b98f;font-size:8px;letter-spacing:1px;margin-top:4px}
 .empty{text-align:center;color:var(--muted);font-size:11px;padding:22px;line-height:1.7}
 .formlabel{display:block;color:var(--muted);font-size:10px;margin:12px 0 6px}
 .formfield{width:100%;padding:13px;border-radius:10px;border:1px solid var(--line);background:#0d1218;color:var(--text);font:inherit;font-size:12px}
@@ -231,7 +235,8 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
   <div class="lock" id="withdrawalLocked">
     <small>WITHDRAWAL STATUS</small>
     <h3>WITHDRAWAL LOCKED</h3>
-    <p>Open on the day. Keep accumulating KNV.</p>
+    <p>Withdrawals open on 1 March 2027. Keep accumulating KNV.</p>
+    <div class="countdown" id="withdrawalCountdown" role="timer" aria-live="off">Loading countdown…</div>
   </div>
   <div class="panel" id="withdrawalPanel" hidden>
     <h3>Request USDT withdrawal</h3>
@@ -248,7 +253,7 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
       <input class="formfield" id="withdrawalAddress" name="wallet_address" required autocomplete="off" placeholder="Paste your USDT wallet address">
       <button class="btn" id="withdrawalSubmit" type="submit">SUBMIT WITHDRAWAL REQUEST</button>
     </form>
-    <p class="formnote">The ₦2,000 service fee and actual network gas fee are shown separately during payout review. Requests are subject to admin approval.</p>
+    <p class="formnote">Any applicable USDT network gas fee will be shown separately during payout review. Requests are subject to admin approval.</p>
     <p class="muted" id="withdrawalMinimum"></p>
   </div>
   <div class="panel" id="withdrawalHistoryPanel" hidden>
@@ -320,6 +325,20 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
 const tg=window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
+function updateWithdrawalCountdown(){
+  const target=document.getElementById('withdrawalCountdown');
+  if(!target)return;
+  const opensAt=new Date('2027-03-01T00:00:00+01:00').getTime();
+  const remaining=opensAt-Date.now();
+  if(remaining<=0){target.textContent='Opening day has arrived';return;}
+  const days=Math.floor(remaining/86400000);
+  const hours=Math.floor((remaining%86400000)/3600000);
+  const minutes=Math.floor((remaining%3600000)/60000);
+  const seconds=Math.floor((remaining%60000)/1000);
+  target.innerHTML=`<div><b>${days}</b><span>DAYS</span></div><div><b>${String(hours).padStart(2,'0')}</b><span>HOURS</span></div><div><b>${String(minutes).padStart(2,'0')}</b><span>MINUTES</span></div><div><b>${String(seconds).padStart(2,'0')}</b><span>SECONDS</span></div>`;
+}
+updateWithdrawalCountdown();
+setInterval(updateWithdrawalCountdown,1000);
 const user=tg?.initDataUnsafe?.user;
 document.getElementById('username').textContent=user?.first_name||'Member';
 function notify(message){
