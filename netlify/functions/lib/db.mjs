@@ -10,7 +10,7 @@ export async function dbRequest(path, options = {}) {
     ...options,
     headers: {
       apikey: key,
-      Authorization: "Bearer " + key,
+      ...(key.startsWith("eyJ") ? { Authorization: "Bearer " + key } : {}),
       "Content-Type": "application/json",
       ...(options.headers || {})
     }
