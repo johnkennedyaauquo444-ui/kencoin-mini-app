@@ -8,7 +8,7 @@ export default async req => {
   const zone = query.get("zone_id") || "";
   const event = query.get("event_type") || "";
   const rewardType = query.get("reward_event_type") || "";
-  if (!/^[A-Za-z0-9_.-]{1,180}$/.test(ymid) || zone !== ZONE || event !== "impression") return new Response("Invalid event", { status: 400 });
+  if (!/^[A-Za-z0-9_.-]{1,180}$/.test(ymid) || zone !== ZONE || !["impression","click"].includes(event)) return new Response("Invalid event", { status: 400 });
   if (rewardType === "non_valued") return new Response("Unpaid event ignored", { status: 200 });
   if (rewardType !== "valued") return new Response("Unknown reward event", { status: 400 });
   try {
