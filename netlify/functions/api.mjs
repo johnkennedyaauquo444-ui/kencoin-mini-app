@@ -107,7 +107,8 @@ export default async req => {
         withdrawalInfo(id)
       ]);
       const active = invoices.find(x => x.expires_at && Date.parse(x.expires_at) > Date.now());
-      const balance = ledger.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+      // Use the full ledger total from withdrawalInfo; the history query is intentionally capped.
+      const balance = withdrawal.balance;
       return json({
         user: { telegram_id: id, first_name: user.first_name || "Member", balance, membership: active ? active.plan.toUpperCase() : "STANDARD", membership_expires_at: active?.expires_at || null },
         history: ledger, referrals_count: referrals.length,
