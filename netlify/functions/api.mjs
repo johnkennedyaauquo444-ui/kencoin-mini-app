@@ -14,8 +14,9 @@ export default async req=>{
  try{
   await userRecord(user);
   if(req.method==="GET"&&route==="me"){
-   const [balance,history,paid]=await Promise.all([balanceFor(user.id),ledgerFor(user.id),listJSON("paid/"+user.id+"/")]);
-   const active=paid.map(x=>x.value).sort((a,b)=>new Date(b.paid_at)-new Date(a.paid_at))[0];
+   const [balance,history,invoices]=await Promise.all([balanceFor(user.id),ledgerFor(user.id),listJSON("invoices/")]);
+   const paid=invoices.map(x=>x.value).filter(x=>x.user_id===String(user.id)&&x.status==="paid");
+   const active=paid.sort((a,b)=>new Date(b.expires_at)-new Date(a.expires_at))[0];
    const membership=active&&new Date(active.expires_at)>new Date()?active.plan.toUpperCase():"STANDARD";
    return json({user:{telegram_id:String(user.id),balance,membership,membership_expires_at:active?.expires_at||null},history,usd_equivalent:(balance/100).toFixed(2)});
   }
@@ -38,6 +39,18 @@ export default async req=>{
    const ok=await putOnce("ledger/"+user.id+"/channel-join",{user_id:String(user.id),amount:10,entry_type:"channel_task",reference:"channel-join",description:"Verified official Telegram channel join",created_at:new Date().toISOString()});
    const balance=await balanceFor(user.id);
    return json({ok:ok.modified,credited:ok.modified?10:0,balance,message:ok.modified?"10 KNV channel task credited.":"Channel task already claimed."});
+  }
+  if(route==="referral/register"){
+   const referrer=String(body.referrer_id||"");
+   if(!/^\d{3,20}$/.test(referrer)||referrer===String(user.id))return json({error:"Invalid referral link."},400);
+   const existing=await getJSON("referrals/invitee/"+user.id);
+   if(existing)return json({ok:true,already_registered:true});
+   const saved=await putOnce("referrals/invitee/"+user.id,{invitee_id:String(user.id),referrer_id:referrer,created_at:new Date().toISOString()});
+   return json({ok:saved.modified,already_registered:!saved.modified});
+  }
+  if(route==="referral/stats"){
+   const referrals=await listJSON("referrals/invitee/");
+   return json({count:referrals.filter(x=>x.value.referrer_id===String(user.id)).length,reward_amount:0,message:"Referral rewards are not enabled until a reward amount is approved."});
   }
   if(route==="payment/create"){
    const plan=PLANS[body.plan];if(!plan)return json({error:"Invalid membership plan."},400);
