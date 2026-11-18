@@ -1,65 +1,157 @@
-import { dataStore, json, telegramUser, userRecord, putOnce, getJSON, listJSON, balanceFor, ledgerFor, newId } from "./lib/db.mjs";
-const BOT="https://api.telegram.org/bot";
-const PLANS={silver:{stars:100,days:30},gold:{stars:250,days:30},diamond:{stars:500,days:30}};
-const CHANNEL="@NairaHackerAI_Official";
-async function bot(method,body){
- const token=process.env.BOT_TOKEN;if(!token)throw new Error("BOT_TOKEN is not configured");
- const r=await fetch(BOT+token+"/"+method,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
- const d=await r.json();if(!d.ok)throw new Error(d.description||"Telegram API error");return d.result;
+import { json, telegramUser, rpc, selectRows, insertRow, upsertRow, updateRows, newId, sameSecret } from "./lib/db.mjs";
+
+const BOT_API = "https://api.telegram.org/bot";
+const PLANS = { silver: { stars: 100 }, gold: { stars: 250 }, diamond: { stars: 500 } };
+const CHANNEL = "@NairaHackerAI_Official";
+const WITHDRAWAL_UNLOCK = Date.parse("2027-04-01T00:00:00+01:00");
+
+async function telegram(method, body) {
+  const token = process.env.BOT_TOKEN;
+  if (!token) throw new Error("BOT_TOKEN is not configured in Netlify.");
+  const response = await fetch(BOT_API + token + "/" + method, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body)
+  });
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.description || "Telegram API request failed.");
+  return result.result;
 }
-export default async req=>{
- if(req.method==="OPTIONS")return new Response(null,{status:204});
- const user=await telegramUser(req);if(!user?.id)return json({error:"Open Kencoin inside Telegram to continue."},401);
- const url=new URL(req.url),route=url.pathname.replace(/^\/(?:api|\.netlify\/functions\/api)\/?/,"").replace(/\/$/,"");
- try{
-  await userRecord(user);
-  if(req.method==="GET"&&route==="me"){
-   const [balance,history,invoices]=await Promise.all([balanceFor(user.id),ledgerFor(user.id),listJSON("invoices/")]);
-   const paid=invoices.map(x=>x.value).filter(x=>x.user_id===String(user.id)&&x.status==="paid");
-   const active=paid.sort((a,b)=>new Date(b.expires_at)-new Date(a.expires_at))[0];
-   const membership=active&&new Date(active.expires_at)>new Date()?active.plan.toUpperCase():"STANDARD";
-   return json({user:{telegram_id:String(user.id),balance,membership,membership_expires_at:active?.expires_at||null},history,usd_equivalent:(balance/100).toFixed(2)});
+async function ensureProfile(user) {
+  await upsertRow("kencoin_profiles", {
+    telegram_id: String(user.id), username: user.username || null,
+    first_name: user.first_name || null, last_name: user.last_name || null,
+    updated_at: new Date().toISOString()
+  }, "telegram_id");
+}
+async function balanceFor(id) {
+  const rows = await selectRows("kencoin_ledger", "select=amount&telegram_id=eq." + id);
+  return rows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+}
+async function withdrawalInfo(id) {
+  const locked = Date.now() < WITHDRAWAL_UNLOCK;
+  const settings = await selectRows("kencoin_settings", "select=setting_value&setting_key=eq.minimum_withdrawal_knv&limit=1");
+  const minimum = Number(settings[0]?.setting_value || 0) || null;
+  const rows = await selectRows("kencoin_withdrawals", "select=id,amount,network,wallet_address,status,admin_note,tx_reference,created_at,reviewed_at,paid_at&telegram_id=eq." + id + "&order=created_at.desc&limit=50");
+  const balance = await balanceFor(id);
+  const reserved = rows.filter(x => ["pending","approved"].includes(x.status)).reduce((sum,x) => sum + Number(x.amount),0);
+  return { locked, minimum, balance, available_balance: balance - reserved, history: rows };
+}
+function validWallet(network, address) {
+  if (network === "USDT_TRC20") return /^T[1-9A-HJ-NP-Za-km-z]{33}$/.test(address);
+  if (network === "USDT_BEP20") return /^0x[a-fA-F0-9]{40}$/.test(address);
+  return false;
+}
+function routeOf(url) {
+  return url.pathname.replace(/^\/(?:api|\.netlify\/functions\/api)\/?/, "").replace(/\/$/, "");
+}
+export default async req => {
+  if (req.method === "OPTIONS") return new Response(null, { status: 204 });
+  const url = new URL(req.url), route = routeOf(url);
+  try {
+    if (route === "admin/withdrawals") {
+      if (!sameSecret(process.env.ADMIN_SECRET || "", req.headers.get("x-kencoin-admin-secret") || "")) return json({ error: "Forbidden" }, 403);
+      if (req.method === "GET") {
+        const status = url.searchParams.get("status") || "pending";
+        const rows = await selectRows("kencoin_withdrawals", "select=*&status=eq." + encodeURIComponent(status) + "&order=created_at.asc&limit=100");
+        return json({ withdrawals: rows });
+      }
+      if (req.method === "POST") {
+        const body = await req.json().catch(() => ({}));
+        const result = await rpc("kencoin_review_withdrawal", {
+          p_withdrawal_id: body.withdrawal_id, p_status: body.status,
+          p_admin_note: body.admin_note || null, p_tx_reference: body.tx_reference || null
+        });
+        return json(result);
+      }
+      return json({ error: "Method not allowed" }, 405);
+    }
+
+    const user = await telegramUser(req);
+    if (!user?.id) return json({ error: "Open Kencoin inside Telegram to continue." }, 401);
+    await ensureProfile(user);
+    const id = String(user.id);
+
+    if (req.method === "GET" && route === "me") {
+      const [ledger, invoices, referrals, withdrawal] = await Promise.all([
+        selectRows("kencoin_ledger", "select=amount,entry_type,reference,description,created_at&telegram_id=eq." + id + "&order=created_at.desc&limit=100"),
+        selectRows("kencoin_invoices", "select=plan,expires_at&telegram_id=eq." + id + "&status=eq.paid&order=expires_at.desc&limit=10"),
+        selectRows("kencoin_referrals", "select=invitee_id&referrer_id=eq." + id),
+        withdrawalInfo(id)
+      ]);
+      const now = Date.now();
+      const active = invoices.find(x => x.expires_at && Date.parse(x.expires_at) > now);
+      const balance = ledger.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+      return json({
+        user: { telegram_id: id, first_name: user.first_name || "Member", balance, membership: active ? active.plan.toUpperCase() : "STANDARD", membership_expires_at: active?.expires_at || null },
+        history: ledger, referrals_count: referrals.length,
+        withdrawals: { locked: withdrawal.locked, available_balance: withdrawal.available_balance, history: withdrawal.history },
+        usd_equivalent: (balance / 100).toFixed(2)
+      });
+    }
+
+    if (req.method === "GET" && route === "withdrawals") return json(await withdrawalInfo(id));
+    if (req.method === "GET" && route === "referral/stats") {
+      const rows = await selectRows("kencoin_referrals", "select=invitee_id&referrer_id=eq." + id);
+      return json({ count: rows.length, reward_amount: 0, message: "Referral rewards are not enabled." });
+    }
+    if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+    const body = await req.json().catch(() => ({}));
+
+    if (route === "daily_bonus") {
+      const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const result = await rpc("kencoin_claim_reward", {
+        p_telegram_id: id, p_amount: 3, p_entry_type: "daily_bonus",
+        p_reference: "daily-" + day, p_description: "Daily bonus", p_metadata: { day }
+      });
+      return json({ ...result, message: result.credited ? "3 KNV daily bonus credited." : "Today's daily bonus has already been claimed." });
+    }
+    if (route === "task/channel") {
+      const member = await telegram("getChatMember", { chat_id: CHANNEL, user_id: Number(id) });
+      if (!["member", "administrator", "creator"].includes(member.status)) return json({ error: "Join the official channel first, then verify again." }, 403);
+      const result = await rpc("kencoin_claim_reward", {
+        p_telegram_id: id, p_amount: 10, p_entry_type: "channel_task",
+        p_reference: "channel-join", p_description: "Verified official Telegram channel join", p_metadata: { channel: CHANNEL }
+      });
+      return json({ ...result, message: result.credited ? "10 KNV channel task credited." : "Channel task already claimed." });
+    }
+    if (route === "ad/start") {
+      const ymid = "kc_" + id + "_" + newId();
+      await insertRow("kencoin_ad_sessions", { ymid, telegram_id: id, zone_id: "12287936", status: "pending" });
+      return json({ ymid });
+    }
+    if (route === "referral/register") {
+      const referrer = String(body.referrer_id || "");
+      if (!/^\d{3,20}$/.test(referrer) || referrer === id) return json({ error: "Invalid referral link." }, 400);
+      return json(await rpc("kencoin_register_referral", { p_invitee: id, p_referrer: referrer }));
+    }
+    if (route === "payment/create") {
+      const plan = PLANS[body.plan];
+      if (!plan) return json({ error: "Invalid membership plan." }, 400);
+      const payload = "kc_" + body.plan + "_" + id + "_" + newId();
+      await insertRow("kencoin_invoices", { payload, telegram_id: id, plan: body.plan, stars: plan.stars, status: "pending" });
+      try {
+        const invoiceLink = await telegram("createInvoiceLink", {
+          title: "Kencoin " + body.plan.toUpperCase() + " Membership",
+          description: body.plan + " membership for 30 days",
+          payload, currency: "XTR", prices: [{ label: body.plan + " membership", amount: plan.stars }], provider_token: ""
+        });
+        return json({ invoice_link: invoiceLink });
+      } catch (error) {
+        await updateRows("kencoin_invoices", "payload=eq." + encodeURIComponent(payload), { status: "failed" });
+        throw error;
+      }
+    }
+    if (route === "withdrawals") {
+      if (Date.now() < WITHDRAWAL_UNLOCK) return json({ error: "Withdrawals are locked." }, 403);
+      const amount = Number(body.amount), network = String(body.network || ""), address = String(body.wallet_address || "").trim();
+      if (!Number.isSafeInteger(amount) || amount <= 0) return json({ error: "Enter a valid whole-number KNV amount." }, 400);
+      if (!validWallet(network, address)) return json({ error: "Enter a valid wallet address for the selected USDT network." }, 400);
+      const result = await rpc("kencoin_create_withdrawal", { p_telegram_id: id, p_amount: amount, p_network: network, p_wallet_address: address });
+      return json({ ...result, message: "Withdrawal request submitted for admin review." });
+    }
+    return json({ error: "Unknown API action: " + route }, 404);
+  } catch (error) {
+    const message = String(error?.message || "Server error");
+    const status = /withdrawals_locked/.test(message) ? 403 : /withdrawal_setup_incomplete/.test(message) ? 503 : /below_minimum_withdrawal|insufficient_available_balance|invalid_network/.test(message) ? 400 : 500;
+    return json({ error: message.replace(/^.*\(\d+\)$/, "Request failed") }, status);
   }
-  if(req.method==="GET"&&route==="referral/stats"){
-   const referrals=await listJSON("referrals/invitee/");
-   return json({count:referrals.filter(x=>x.value.referrer_id===String(user.id)).length,reward_amount:0,message:"Referral rewards are not enabled until a reward amount is approved."});
-  }
-  if(req.method!=="POST")return json({error:"Method not allowed"},405);
-  const body=await req.json().catch(()=>({}));
-  if(route==="daily_bonus"){
-   const day=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Lagos",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
-   const ok=await putOnce("ledger/"+user.id+"/daily-"+day,{user_id:String(user.id),amount:3,entry_type:"daily_bonus",reference:"daily-"+day,description:"Daily bonus",created_at:new Date().toISOString()});
-   const balance=await balanceFor(user.id);
-   return json({ok:ok.modified,credited:ok.modified?3:0,balance,message:ok.modified?"3 KNV daily bonus credited.":"Today's daily bonus has already been claimed."});
-  }
-  if(route==="ad/start"){
-   const ymid="kc_"+user.id+"_"+newId();
-   await dataStore().setJSON("adshows/"+ymid,{ymid,user_id:String(user.id),zone_id:"12287936",created_at:new Date().toISOString()},{onlyIfNew:true});
-   return json({ymid});
-  }
-  if(route==="task/channel"){
-   const member=await bot("getChatMember",{chat_id:CHANNEL,user_id:user.id});
-   if(!["member","administrator","creator"].includes(member.status))return json({error:"Join the official channel first, then verify again."},403);
-   const ok=await putOnce("ledger/"+user.id+"/channel-join",{user_id:String(user.id),amount:10,entry_type:"channel_task",reference:"channel-join",description:"Verified official Telegram channel join",created_at:new Date().toISOString()});
-   const balance=await balanceFor(user.id);
-   return json({ok:ok.modified,credited:ok.modified?10:0,balance,message:ok.modified?"10 KNV channel task credited.":"Channel task already claimed."});
-  }
-  if(route==="referral/register"){
-   const referrer=String(body.referrer_id||"");
-   if(!/^\d{3,20}$/.test(referrer)||referrer===String(user.id))return json({error:"Invalid referral link."},400);
-   if(!(await getJSON("users/"+referrer)))return json({error:"Referral account was not found."},404);
-   const existing=await getJSON("referrals/invitee/"+user.id);
-   if(existing)return json({ok:true,already_registered:true});
-   const saved=await putOnce("referrals/invitee/"+user.id,{invitee_id:String(user.id),referrer_id:referrer,created_at:new Date().toISOString()});
-   return json({ok:saved.modified,already_registered:!saved.modified});
-  }
-  if(route==="payment/create"){
-   const plan=PLANS[body.plan];if(!plan)return json({error:"Invalid membership plan."},400);
-   const payload="kc_"+body.plan+"_"+user.id+"_"+newId();
-   const invoice=await bot("createInvoiceLink",{title:"Kencoin "+body.plan.toUpperCase()+" Membership",description:body.plan+" membership for 30 days",payload,currency:"XTR",prices:[{label:body.plan+" membership",amount:plan.stars}],provider_token:""});
-   await dataStore().setJSON("invoices/"+payload,{payload,user_id:String(user.id),plan:body.plan,stars:plan.stars,status:"pending",created_at:new Date().toISOString()},{onlyIfNew:true});
-   return json({invoice_link:invoice});
-  }
-  return json({error:"Unknown API action: "+route},404);
- }catch(e){return json({error:e.message||"Server error"},500);}
 };
