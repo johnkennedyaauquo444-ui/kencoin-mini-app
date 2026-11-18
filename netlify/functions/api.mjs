@@ -26,7 +26,7 @@ export default async req=>{
     if(req.method!=="POST"){await client.query("ROLLBACK");return json({error:"Method not allowed"},405);}
     const body=await req.json().catch(()=>({}));
     if(route==="daily_bonus"){
-      const day=new Date().toISOString().slice(0,10);
+      const day=new Intl.DateTimeFormat("en-CA",{timeZone:"Africa/Lagos",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
       const ok=await addLedger(client,{userId:user.id,amount:3,type:"daily_bonus",reference:"daily:"+user.id+":"+day,description:"Daily bonus"});
       const b=await client.query("SELECT balance FROM users WHERE telegram_id=$1",[String(user.id)]);
       await client.query("COMMIT");return json({ok,credited:ok?3:0,balance:Number(b.rows[0].balance),message:ok?"3 KNV daily bonus credited.":"Today's daily bonus has already been claimed."});
