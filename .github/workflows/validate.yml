@@ -1,0 +1,23 @@
+name: Validate Kencoin staging
+on:
+  push:
+    branches: ["staging/monetag-postback"]
+  pull_request:
+    branches: ["main"]
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check JavaScript syntax
+        run: |
+          node --check kencoin-client.js
+          node --check netlify/functions/lib/db.mjs
+          node --check netlify/functions/api.mjs
+          node --check netlify/functions/payment-confirm.mjs
+          node --check netlify/functions/monetag-postback.mjs
+          node --check scripts/check-inline-js.mjs
+          node scripts/check-inline-js.mjs
