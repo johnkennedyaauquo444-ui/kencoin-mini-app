@@ -186,7 +186,7 @@ export default async req => {
     return json({ error: "Unknown API action: " + route }, 404);
   } catch (error) {
     const message = String(error?.message || "Server error");
-    const status = /withdrawals_locked/.test(message) ? 403 : /withdrawal_setup_incomplete/.test(message) ? 503 : /below_minimum_withdrawal|insufficient_available_balance|invalid_network|invalid_withdrawal_amount/.test(message) ? 400 : 500;
+    const status = /withdrawals_locked/.test(message) ? 403 : /withdrawal_setup_incomplete/.test(message) ? 503 : /below_minimum_withdrawal|insufficient_available_balance|invalid_network|invalid_withdrawal_amount|invalid_wallet_address/.test(message) ? 400 : 500;
     if (status === 500) {
       console.error("[Kencoin API]", message);
       return json({ error: "Kencoin service is temporarily unavailable. Please try again." }, 500);
@@ -196,7 +196,8 @@ export default async req => {
       /below_minimum_withdrawal/.test(message) ? "The requested amount is below the minimum." :
       /insufficient_available_balance/.test(message) ? "Insufficient available KNV balance." :
       /invalid_network/.test(message) ? "Invalid USDT network." :
-      /invalid_withdrawal_amount/.test(message) ? "Enter a valid whole-number KNV amount." : message;
+      /invalid_withdrawal_amount/.test(message) ? "Enter a valid whole-number KNV amount." :
+      /invalid_wallet_address/.test(message) ? "Enter a valid wallet address." : message;
     return json({ error: friendly }, status);
   }
 };
