@@ -27,11 +27,18 @@ begin
   if min_amount is null or min_amount<=0 then
     raise exception 'withdrawal_setup_incomplete';
   end if;
+  if p_amount is null or p_amount<=0 then
+    raise exception 'invalid_withdrawal_amount';
+  end if;
   if p_amount<min_amount then
     raise exception 'below_minimum_withdrawal';
   end if;
-  if p_network not in ('USDT_TRC20','USDT_BEP20') then
+  if p_network is null or p_network not in ('USDT_TRC20','USDT_BEP20') then
     raise exception 'invalid_network';
+  end if;
+
+  if p_wallet_address is null or length(trim(p_wallet_address))=0 then
+    raise exception 'invalid_wallet_address';
   end if;
 
   perform pg_advisory_xact_lock(p_telegram_id);
