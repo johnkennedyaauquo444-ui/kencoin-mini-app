@@ -10,7 +10,6 @@ security definer
 set search_path=pg_catalog, public, pg_temp
 as $$
 declare
-  min_amount integer;
   current_balance bigint;
   reserved bigint;
   new_id uuid;
@@ -19,19 +18,8 @@ begin
     raise exception 'withdrawals_locked';
   end if;
 
-  select nullif(setting_value,'')::integer
-    into min_amount
-    from public.kencoin_settings
-    where setting_key='minimum_withdrawal_knv';
-
-  if min_amount is null or min_amount<=0 then
-    raise exception 'withdrawal_setup_incomplete';
-  end if;
   if p_amount is null or p_amount<=0 then
     raise exception 'invalid_withdrawal_amount';
-  end if;
-  if p_amount<min_amount then
-    raise exception 'below_minimum_withdrawal';
   end if;
   if p_network is null or p_network not in ('USDT_TRC20','USDT_BEP20') then
     raise exception 'invalid_network';
