@@ -321,6 +321,8 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
   <h3>Telegram Session Diagnostics (Staging)</h3>
   <p class="muted" id="tgdiagtext">Checking Telegram session…</p>
   <button class="btn secondary" onclick="checkTelegramSession()">REFRESH CHECK</button>
+  <button class="btn secondary" onclick="testKencoinApiAuth()">TEST API AUTH</button>
+  <p class="muted" id="apiDiagResult">API auth not tested yet.</p>
 </div>
 <button class="btn secondary" style="margin:12px" onclick="toggleTelegramDiagnostics()">SESSION DIAGNOSTICS</button>
 <div class="toast" id="toast"></div>
@@ -345,6 +347,19 @@ function checkTelegramSession(){
   ];
   const target=document.getElementById('tgdiagtext');
   if(target) target.textContent=lines.join(' · ');
+}
+async function testKencoinApiAuth(){
+  const target=document.getElementById('apiDiagResult');
+  if(target)target.textContent='Testing API authentication…';
+  const initData=window.Telegram?.WebApp?.initData||'';
+  if(!initData){if(target)target.textContent='Cannot test: initData is empty.';return;}
+  try{
+    const response=await fetch('/api/me',{method:'GET',headers:{Authorization:'tma '+initData}});
+    let data={};try{data=await response.json()}catch{}
+    if(target)target.textContent=response.ok?'API auth: SUCCESS (HTTP '+response.status+')':'API auth: FAILED (HTTP '+response.status+') · '+(data.error||'No error detail returned');
+  }catch(error){
+    if(target)target.textContent='API test could not reach endpoint: '+(error.message||'network error');
+  }
 }
 function toggleTelegramDiagnostics(){
   const box=document.getElementById('tgdiag');
