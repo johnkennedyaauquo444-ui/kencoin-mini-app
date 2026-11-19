@@ -52,9 +52,9 @@
     if (panel) panel.hidden = !!data.locked;
     if (historyPanel) historyPanel.hidden = !!data.locked;
     if (available) available.textContent = "Available balance: " + Number(data.available_balance || 0).toLocaleString() + " KNV";
-    if (amount && data.minimum) amount.min = String(data.minimum);
-    if (minimum) minimum.textContent = data.minimum ? "Minimum request: " + Number(data.minimum).toLocaleString() + " KNV." : "Withdrawal minimum is not configured yet. Requests are disabled.";
-    if (submit) submit.disabled = !data.minimum;
+    if (amount) amount.min = "1";
+    if (minimum) minimum.textContent = "No minimum withdrawal. Any positive whole-number KNV amount is allowed.";
+    if (submit) submit.disabled = false;
     if (history) {
       history.replaceChildren();
       if (!data.history?.length) {
