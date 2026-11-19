@@ -28,8 +28,7 @@ async function balanceFor(id) {
 }
 async function withdrawalInfo(id) {
   const locked = Date.now() < WITHDRAWAL_UNLOCK;
-  const settings = await selectRows("kencoin_settings", "select=setting_value&setting_key=eq.minimum_withdrawal_knv&limit=1");
-  const minimum = Number(settings[0]?.setting_value || 0) || null;
+  const minimum = null; // No minimum withdrawal amount is configured or enforced.
   const [rows, reservedRows, balance] = await Promise.all([
     selectRows("kencoin_withdrawals", "select=id,amount,network,wallet_address,status,admin_note,tx_reference,created_at,reviewed_at,paid_at&telegram_id=eq." + id + "&order=created_at.desc&limit=50"),
     selectRows("kencoin_withdrawals", "select=amount&telegram_id=eq." + id + "&status=in.(pending,approved)"),
