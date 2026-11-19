@@ -1,4 +1,4 @@
-import { json, telegramUser, rpc, selectRows, selectAllRows, insertRow, upsertRow, updateRows, newId, sameSecret } from "./lib/db.mjs";
+import { json, telegramUser, diagnoseTelegramInitData, rpc, selectRows, selectAllRows, insertRow, upsertRow, updateRows, newId, sameSecret } from "./lib/db.mjs";
 
 const BOT_API = "https://api.telegram.org/bot";
 const PLANS = { silver: { stars: 100 }, gold: { stars: 250 }, diamond: { stars: 500 } };
@@ -49,6 +49,7 @@ export default async req => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
   const url = new URL(req.url), route = routeOf(url);
   try {
+    if (route === "auth-diagnostic" && req.method === "GET") return json(diagnoseTelegramInitData(req));
     // Server-to-server admin route. Protected by ADMIN_SECRET, not Mini App auth.
     if (route === "admin/withdrawals") {
       if (!sameSecret(process.env.ADMIN_SECRET || "", req.headers.get("x-kencoin-admin-secret") || "")) return json({ error: "Forbidden" }, 403);
