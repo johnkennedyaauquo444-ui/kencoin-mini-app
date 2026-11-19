@@ -151,12 +151,10 @@ end $$;
 create or replace function public.kencoin_create_withdrawal(
   p_telegram_id bigint,p_amount integer,p_network text,p_wallet_address text
 ) returns jsonb language plpgsql security definer set search_path=pg_catalog, public, pg_temp as $$
-declare min_amount integer; current_balance bigint; reserved bigint; new_id uuid;
+declare current_balance bigint; reserved bigint; new_id uuid;
 begin
   if now() < timestamptz '2027-04-01 00:00:00+01' then raise exception 'withdrawals_locked'; end if;
-  select nullif(setting_value,'')::integer into min_amount from kencoin_settings where setting_key='minimum_withdrawal_knv';
-  if min_amount is null or min_amount<=0 then raise exception 'withdrawal_setup_incomplete'; end if;
-  if p_amount<min_amount then raise exception 'below_minimum_withdrawal'; end if;
+  if p_amount is null or p_amount<=0 then raise exception 'invalid_withdrawal_amount'; end if;
   if p_network not in ('USDT_TRC20','USDT_BEP20') then raise exception 'invalid_network'; end if;
   perform pg_advisory_xact_lock(p_telegram_id);
   select coalesce(sum(amount),0) into current_balance from kencoin_ledger where telegram_id=p_telegram_id;
