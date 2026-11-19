@@ -16,7 +16,7 @@ declare
   reserved bigint;
   new_id uuid;
 begin
-  if now() < timestamptz '2027-03-01 00:00:00+01' then
+  if now() < timestamptz '2027-04-01 00:00:00+01' then
     raise exception 'withdrawals_locked';
   end if;
 
