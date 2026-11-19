@@ -133,7 +133,7 @@
       const session = await call("/ad/start", {});
       if (!session?.ymid) throw new Error("Could not create a secure ad session. Please try again.");
       if (button) button.textContent = "SHOWING AD...";
-      const result = await show({ type: "end", ymid: session.ymid, requestVar: "daily_reward" });
+      const result = await show({ ymid: session.ymid, requestVar: "daily_reward" });
       if (result?.reward_event_type === "valued") {
         if (status) status.textContent = "Monetag confirmed a valued ad. Verifying your wallet credit...";
         note("Monetag confirmed the ad. Your 2 KNV wallet credit is being verified.");
