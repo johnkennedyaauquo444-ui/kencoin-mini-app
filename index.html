@@ -317,6 +317,12 @@ footer{text-align:center;color:#626b77;font-size:9px;padding:25px 0}
     <button data-page="history" onclick="showPage('history')"><span>◷</span>HISTORY</button>
   </nav>
 </div>
+<div class="panel" id="tgdiag" style="margin:12px;display:none">
+  <h3>Telegram Session Diagnostics (Staging)</h3>
+  <p class="muted" id="tgdiagtext">Checking Telegram session…</p>
+  <button class="btn secondary" onclick="checkTelegramSession()">REFRESH CHECK</button>
+</div>
+<button class="btn secondary" style="margin:12px" onclick="toggleTelegramDiagnostics()">SESSION DIAGNOSTICS</button>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -325,6 +331,27 @@ tg?.ready();
 tg?.expand();
 const user=tg?.initDataUnsafe?.user;
 document.getElementById('username').textContent=user?.first_name||'Member';
+function checkTelegramSession(){
+  const webApp=window.Telegram?.WebApp;
+  const raw=webApp?.initData||'';
+  const safeUser=webApp?.initDataUnsafe?.user;
+  const lines=[
+    'Telegram WebApp SDK: '+(webApp?'FOUND':'MISSING'),
+    'initData: '+(raw.length?'PRESENT':'EMPTY'),
+    'initData length: '+raw.length+' characters',
+    'Telegram user data: '+(safeUser?'FOUND':'MISSING'),
+    'Platform: '+(webApp?.platform||'unknown'),
+    'WebApp version: '+(webApp?.version||'unknown')
+  ];
+  const target=document.getElementById('tgdiagtext');
+  if(target) target.textContent=lines.join(' · ');
+}
+function toggleTelegramDiagnostics(){
+  const box=document.getElementById('tgdiag');
+  if(!box)return;
+  box.style.display=box.style.display==='none'?'block':'none';
+  if(box.style.display==='block')checkTelegramSession();
+}
 function notify(message){
   const el=document.getElementById('toast');
   el.textContent=message;
