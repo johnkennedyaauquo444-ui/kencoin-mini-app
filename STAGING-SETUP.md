@@ -150,11 +150,7 @@ Use Monetag's exact macro placeholders shown above when saving the postback for 
 
 While locked, the Mini App shows only “WITHDRAWAL LOCKED” and the supporting message “Open on the day. Keep accumulating KNV.” It does not show the unlock date or a countdown. The backend rejects withdrawal requests before 1 April 2027, 00:00 Africa/Lagos time. After unlock, the Mini App supports USDT TRC20 and BEP20 request submission, wallet address validation, balance reservation and request history. Admins review requests at /admin.html, approve or reject them, and record a transaction reference when paid.
 
-The minimum withdrawal amount has not been approved. It is intentionally blank in kencoin_settings, so withdrawal requests remain disabled until the owner chooses a minimum. After that decision, run this in Supabase SQL Editor:
-
-    update public.kencoin_settings
-    set setting_value = 'YOUR_APPROVED_MINIMUM_KNV'
-    where setting_key = 'minimum_withdrawal_knv';
+No minimum withdrawal amount applies. Any positive whole-number KNV amount may be requested, subject to available balance and the withdrawal lock. The minimum_withdrawal_knv setting is no longer used.
 
 There is no ₦2,000 service fee. If a network fee is incurred, show the actual USDT network gas fee separately and transparently; never add a fixed Kencoin service fee. The current workflow records and administers requests; it does not automatically send USDT. Admin must pay from a funded treasury wallet and record the transaction reference before marking a request paid.
 
@@ -174,7 +170,7 @@ Make @KencoinOfficialBot an administrator of @NairaHackerAI_Official so getChatM
 - Test pre-checkout rejection for wrong user, amount, currency and expired invoice.
 - Complete a real Stars payment and confirm activation only after successful_payment reaches /payment-confirm.
 - Test referral attribution and duplicate referrals.
-- Confirm withdrawals are rejected while locked. After unlock, test address validation, configured minimum, insufficient balance, admin approval, rejection and paid transaction reference.
+- Confirm withdrawals are rejected while locked. After unlock, test address validation, small positive withdrawals (no minimum), insufficient balance, admin approval, rejection and paid transaction reference.
 - Check browser console and Netlify function logs.
 
 Syntax checks do not replace live integration tests. Do not deploy or merge until every required test passes.
