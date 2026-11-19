@@ -350,15 +350,15 @@ function checkTelegramSession(){
 }
 async function testKencoinApiAuth(){
   const target=document.getElementById('apiDiagResult');
-  if(target)target.textContent='Testing API authentication…';
+  if(target)target.textContent='Checking Telegram signature, token configuration, session age and user data…';
   const initData=window.Telegram?.WebApp?.initData||'';
   if(!initData){if(target)target.textContent='Cannot test: initData is empty.';return;}
   try{
-    const response=await fetch('/api/me',{method:'GET',headers:{Authorization:'tma '+initData}});
-    let data={};try{data=await response.json()}catch{}
-    if(target)target.textContent=response.ok?'API auth: SUCCESS (HTTP '+response.status+')':'API auth: FAILED (HTTP '+response.status+') · '+(data.error||'No error detail returned');
+    const response=await fetch('/api/auth-diagnostic',{method:'GET',headers:{Authorization:'tma '+initData}});
+    const data=await response.json().catch(()=>({}));
+    if(target)target.textContent='Auth diagnostics: '+JSON.stringify(data);
   }catch(error){
-    if(target)target.textContent='API test could not reach endpoint: '+(error.message||'network error');
+    if(target)target.textContent='Diagnostic request failed: '+(error.message||'network error');
   }
 }
 function toggleTelegramDiagnostics(){
