@@ -10,6 +10,8 @@ export default async req => {
   const event = query.get("event_type") || "";
   const rewardType = query.get("reward_event_type") || "";
   if (!/^[A-Za-z0-9_.-]{1,180}$/.test(ymid) || zone !== ZONE || !["impression","click"].includes(event)) return new Response("Invalid event", { status: 400 });
+  // Reward only a confirmed valued impression, never a click event.
+  if (event !== "impression") return new Response("Click event ignored", { status: 200 });
   if (rewardType === "non_valued") return new Response("Unpaid event ignored", { status: 200 });
   if (rewardType !== "valued") return new Response("Unknown reward event", { status: 400 });
   console.info("[Kencoin Monetag postback]", JSON.stringify({ ymid, zone_id: zone, event_type: event, reward_event_type: rewardType, telegram_id_present: Boolean(query.get("telegram_id")) }));
