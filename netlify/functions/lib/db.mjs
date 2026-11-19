@@ -54,6 +54,29 @@ export async function upsertRow(table, value, conflict) {
 export async function updateRows(table, query, value) {
   return dbRequest(table + "?" + query, { method: "PATCH", body: JSON.stringify(value), headers: { Prefer: "return=representation" } });
 }
+export function diagnoseTelegramInitData(req) {
+  const auth=req.headers.get("authorization")||"";
+  const initData=auth.startsWith("tma ")?auth.slice(4):"";
+  const token=process.env.BOT_TOKEN||"";
+  if(!initData)return {init_data:"missing",bot_token_configured:!!token,signature:"not_checked",auth_date:"not_checked",user:"not_checked"};
+  if(!token)return {init_data:"present",bot_token_configured:false,signature:"not_checked",auth_date:"not_checked",user:"not_checked"};
+  const params=new URLSearchParams(initData);
+  const hash=params.get("hash")||"";
+  if(!/^[a-f0-9]{64}$/i.test(hash))return {init_data:"present",bot_token_configured:true,signature:"malformed_hash",auth_date:"not_checked",user:"not_checked"};
+  params.delete("hash");
+  const check=[...params.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>k+"="+v).join("\n");
+  const secret=crypto.createHmac("sha256","WebAppData").update(token).digest();
+  const calculated=crypto.createHmac("sha256",secret).update(check).digest("hex");
+  const a=Buffer.from(hash,"hex"),b=Buffer.from(calculated,"hex");
+  if(a.length!==b.length||!crypto.timingSafeEqual(a,b))return {init_data:"present",bot_token_configured:true,signature:"mismatch",auth_date:"not_checked",user:"not_checked"};
+  const authDate=Number(params.get("auth_date")),age=Date.now()/1000-authDate;
+  if(!authDate||age>3600||age< -60)return {init_data:"present",bot_token_configured:true,signature:"valid",auth_date:"expired_or_invalid",user:"not_checked"};
+  try{
+    const user=JSON.parse(params.get("user")||"null");
+    if(!user||!/^[0-9]{3,20}$/.test(String(user.id)))return {init_data:"present",bot_token_configured:true,signature:"valid",auth_date:"valid",user:"invalid"};
+    return {init_data:"present",bot_token_configured:true,signature:"valid",auth_date:"valid",user:"valid"};
+  }catch{return {init_data:"present",bot_token_configured:true,signature:"valid",auth_date:"valid",user:"invalid"}}
+}
 export async function telegramUser(req) {
   const auth = req.headers.get("authorization") || "";
   const initData = auth.startsWith("tma ") ? auth.slice(4) : "";
