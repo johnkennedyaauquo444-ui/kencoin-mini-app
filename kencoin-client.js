@@ -1,0 +1,221 @@
+(() => {
+  const api = "/api";
+  const auth = () => window.Telegram?.WebApp?.initData || "";
+  const tg = () => window.Telegram?.WebApp;
+  const note = message => window.notify ? window.notify(message) : alert(message);
+
+  async function call(path, body) {
+    const response = await fetch(api + path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        Authorization: "tma " + auth(),
+        ...(body === undefined ? {} : { "Content-Type": "application/json" })
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Request failed");
+    return data;
+  }
+
+  function renderHistory(rows) {
+    const target = document.getElementById("historyList");
+    if (!target) return;
+    target.replaceChildren();
+    if (!rows?.length) {
+      target.textContent = "No activity yet.";
+      target.className = "empty";
+      return;
+    }
+    target.className = "";
+    for (const row of rows) {
+      const item = document.createElement("div");
+      item.className = "historyrow";
+      const amount = Number(row.amount || 0);
+      const sign = amount > 0 ? "+" : "";
+      item.textContent = new Date(row.created_at).toLocaleString() + " · " +
+        (row.description || row.entry_type || "Wallet activity") + " · " + sign + amount + " KNV";
+      target.appendChild(item);
+    }
+  }
+
+  function renderWithdrawal(data) {
+    const locked = document.getElementById("withdrawalLocked");
+    const panel = document.getElementById("withdrawalPanel");
+    const available = document.getElementById("withdrawalAvailable");
+    const minimum = document.getElementById("withdrawalMinimum");
+    const amount = document.getElementById("withdrawalAmount");
+    const submit = document.getElementById("withdrawalSubmit");
+    const history = document.getElementById("withdrawalHistory");
+    const historyPanel = document.getElementById("withdrawalHistoryPanel");
+    if (locked) locked.hidden = !data.locked;
+    if (panel) panel.hidden = !!data.locked;
+    if (historyPanel) historyPanel.hidden = !!data.locked;
+    if (available) available.textContent = "Available balance: " + Number(data.available_balance || 0).toLocaleString() + " KNV";
+    if (amount) amount.min = "1";
+    if (minimum) minimum.textContent = "No minimum withdrawal. Any positive whole-number KNV amount is allowed.";
+    if (submit) submit.disabled = false;
+    if (history) {
+      history.replaceChildren();
+      if (!data.history?.length) {
+        history.textContent = "No withdrawal requests yet.";
+        history.className = "empty";
+      } else {
+        history.className = "";
+        for (const item of data.history) {
+          const row = document.createElement("div");
+          row.className = "historyrow";
+          row.textContent = Number(item.amount).toLocaleString() + " KNV · " +
+            item.network.replace("_", " ") + " · " + item.status.toUpperCase() +
+            " · " + new Date(item.created_at).toLocaleDateString() +
+            (item.tx_reference ? " · TX: " + item.tx_reference : "");
+          history.appendChild(row);
+        }
+      }
+    }
+  }
+
+  window.loadKencoinProfile = async function() {
+    if (!auth()) return;
+    try {
+      const data = await call("/me");
+      const balance = Number(data.user?.balance || 0);
+      const mainBalance = document.getElementById("balance");
+      const walletBalance = document.getElementById("walletBalance");
+      const usd = document.getElementById("usdBalance");
+      const membership = document.getElementById("membership");
+      const username = document.getElementById("username");
+      if (mainBalance) mainBalance.innerHTML = balance.toLocaleString() + " <span>KNV</span>";
+      if (walletBalance) walletBalance.innerHTML = balance.toLocaleString() + " <span>KNV</span>";
+      if (usd) usd.textContent = "≈ $" + (balance / 100).toFixed(2) + " display estimate";
+      if (membership) membership.textContent = data.user?.membership || "STANDARD";
+      if (username) username.textContent = data.user?.first_name || "Member";
+      renderHistory(data.history || []);
+      const withdrawal = await call("/withdrawals");
+      if (walletBalance) walletBalance.innerHTML = Number(withdrawal.available_balance || 0).toLocaleString() + " <span>KNV</span>";
+      renderWithdrawal(withdrawal);
+    } catch (error) {
+      note(error.message || "Could not load your Kencoin account.");
+    }
+  };
+
+  window.requestAction = async function(action, body = {}) {
+    if (!auth()) return note("Please open Kencoin inside Telegram.");
+    try {
+      const data = await call("/" + action, body);
+      note(data.message || (data.credited ? "Reward credited." : "Request completed."));
+      await window.loadKencoinProfile();
+    } catch (error) {
+      note(error.message || "Request failed.");
+    }
+  };
+
+  function waitForMonetag(timeoutMs = 10000) {
+    return new Promise((resolve, reject) => {
+      const started = Date.now();
+      const check = () => {
+        if (typeof window.show_12287936 === "function") return resolve(window.show_12287936);
+        if (Date.now() - started >= timeoutMs) return reject(new Error("Monetag could not load. Check your connection and try again."));
+        setTimeout(check, 200);
+      };
+      check();
+    });
+  }
+
+  window.watchAd = async function() {
+    if (!auth()) return note("Open Kencoin inside Telegram first.");
+    const button = document.querySelector('[onclick="watchAd()"]');
+    const status = document.getElementById("adstatus");
+    if (button) { button.disabled = true; button.textContent = "CONNECTING TO AD..."; }
+    try {
+      const show = await waitForMonetag();
+      if (status) status.textContent = "Preparing a secure rewarded ad session...";
+      const session = await call("/ad/start", {});
+      if (!session?.ymid) throw new Error("Could not create a secure ad session. Please try again.");
+      if (button) button.textContent = "SHOWING AD...";
+      const result = await show({ ymid: session.ymid, requestVar: "daily_reward" });
+      if (result?.reward_event_type === "valued") {
+        if (status) status.textContent = "Monetag confirmed a valued ad. Verifying your wallet credit...";
+        note("Monetag confirmed the ad. Your 2 KNV wallet credit is being verified.");
+      } else if (result?.reward_event_type === "non_valued") {
+        if (status) status.textContent = "This ad was not valued, so no KNV reward was earned.";
+        note("Ad completed, but Monetag marked it as non-valued. No KNV was added.");
+      } else {
+        if (status) status.textContent = "Ad closed. Waiting for Monetag's server-side confirmation.";
+        note("Ad closed. Any reward will be added only after server verification.");
+      }
+      setTimeout(window.loadKencoinProfile, 2500);
+      setTimeout(window.loadKencoinProfile, 7000);
+      setTimeout(window.loadKencoinProfile, 15000);
+    } catch (error) {
+      if (status) status.textContent = "Ad not verified. No KNV has been added.";
+      note(error.message || "Ad could not be verified. Please try again later.");
+      setTimeout(window.loadKencoinProfile, 5000);
+    } finally {
+      if (button) { button.disabled = false; button.textContent = "WATCH REWARDED AD"; }
+    }
+  };
+
+  window.buyPlan = async function(plan) {
+    if (!auth()) return note("Open Kencoin inside Telegram to purchase.");
+    if (typeof tg()?.openInvoice !== "function") return note("Telegram invoice checkout is unavailable in this app session.");
+    try {
+      const data = await call("/payment/create", { plan });
+      if (!data.invoice_link) throw new Error("Invoice service did not return an invoice link.");
+      tg().openInvoice(data.invoice_link, status => {
+        if (status === "paid") {
+          note("Payment received. Membership activates after the bot verifies successful_payment.");
+          setTimeout(window.loadKencoinProfile, 2500);
+          setTimeout(window.loadKencoinProfile, 8000);
+        } else if (status === "cancelled") note("Payment cancelled. No membership activated.");
+        else if (status === "failed") note("Payment failed. Please try again.");
+      });
+    } catch (error) {
+      note(error.message || "Could not start Telegram Stars checkout.");
+    }
+  };
+
+  window.invite = async function() {
+    const user = tg()?.initDataUnsafe?.user;
+    if (!user?.id) return note("Open Kencoin inside Telegram first.");
+    const link = "https://t.me/KencoinOfficialBot?start=" + user.id;
+    const target = document.getElementById("referralLink");
+    if (target) target.textContent = link;
+    let count = 0;
+    try { count = (await call("/referral/stats")).count || 0; } catch {}
+    note("Invite link ready. Verified referrals: " + count + ". No referral KNV reward is enabled.");
+    const share = "https://t.me/share/url?url=" + encodeURIComponent(link);
+    if (tg()?.openTelegramLink) tg().openTelegramLink(share);
+    else if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(link);
+  };
+
+  window.addEventListener("load", async () => {
+    const startParam = tg()?.initDataUnsafe?.start_param;
+    const userId = tg()?.initDataUnsafe?.user?.id;
+    if (startParam && userId && /^\d{3,20}$/.test(String(startParam)) && String(startParam) !== String(userId)) {
+      try { await call("/referral/register", { referrer_id: String(startParam) }); } catch {}
+    }
+    const form = document.getElementById("withdrawalForm");
+    form?.addEventListener("submit", async event => {
+      event.preventDefault();
+      const submit = document.getElementById("withdrawalSubmit");
+      if (submit) { submit.disabled = true; submit.textContent = "SUBMITTING..."; }
+      try {
+        const values = new FormData(form);
+        await call("/withdrawals", {
+          amount: Number(values.get("amount")),
+          network: String(values.get("network") || ""),
+          wallet_address: String(values.get("wallet_address") || "").trim()
+        });
+        form.reset();
+        note("Withdrawal request submitted for admin review.");
+        await window.loadKencoinProfile();
+      } catch (error) {
+        note(error.message || "Could not submit withdrawal request.");
+      } finally {
+        if (submit) { submit.disabled = false; submit.textContent = "SUBMIT WITHDRAWAL REQUEST"; }
+      }
+    });
+    await window.loadKencoinProfile();
+  });
+})();

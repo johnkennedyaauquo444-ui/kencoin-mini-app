@@ -1,0 +1,36 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/monetag-postback"
+  to = "/.netlify/functions/monetag-postback"
+  status = 200
+
+[[redirects]]
+  from = "/payment-confirm"
+  to = "/.netlify/functions/payment-confirm"
+  status = 200
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/payment-confirm"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/monetag-postback"
+  [headers.values]
+    Cache-Control = "no-store"
