@@ -18,7 +18,7 @@ Do not merge this branch into main or deploy until the external services below a
 
 Create a free Supabase project at https://supabase.com/dashboard. The current Free plan includes 500 MB Postgres storage, but projects can pause after one week of inactivity. See https://supabase.com/pricing.
 
-For a brand-new Supabase project, run the full file database/supabase-schema.sql once. If this database already exists from an earlier Kencoin setup, do not rerun the whole schema blindly; apply database/migrations/20261119_withdrawal_unlock_march_2027.sql in the SQL Editor to update the withdrawal date safely.
+For a brand-new Supabase project, run the full file database/supabase-schema.sql once. If this database already exists from an earlier Kencoin setup, do not rerun the whole schema blindly; apply database/migrations/20261119_withdrawal_unlock_april_2027.sql in the SQL Editor to update the withdrawal date safely.
 
 From Project Settings → API Keys (or the Connect dialog), copy the Project URL and the server-side Secret API key. Set them in Netlify as SUPABASE_URL and SUPABASE_SECRET_KEY. Never put the secret key in frontend JavaScript. Do not use a publishable key in the Netlify functions.
 
