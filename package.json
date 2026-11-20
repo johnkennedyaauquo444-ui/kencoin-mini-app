@@ -1,14 +1,13 @@
-
 {
-  "name": "kencoin-mini-app",
+  "name": "video-factory-ai",
   "version": "1.0.0",
-  "description": "Kencoin Telegram Mini App backend",
+  "private": true,
+  "description": "VIDEO FACTORY AI Telegram Mini App backend",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
-    "express": "^5.1.0"
-  }
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  },
+  "engines": { "node": ">=18" }
 }
-
