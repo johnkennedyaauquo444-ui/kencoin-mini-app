@@ -1,34 +1,32 @@
 # VIDEO FACTORY AI
 
-This repository has been rebranded from the Kencoin Mini App into VIDEO FACTORY AI.
+Telegram Mini App frontend and Node.js backend using Agnes Video 2.5 Flash.
 
-## Current state
-- Responsive Telegram Mini App interface for text-to-video and image-to-video.
-- Prompt, aspect ratio, duration, upload and history UI.
-- Telegram Mini App initData verification on the backend.
-- Secure server-side video-provider adapter endpoint.
-- No video API key or Telegram bot token is exposed in frontend code.
+## Features in this build
+- Text-to-video and image-to-video UI.
+- Vertical, landscape and square aspect ratios.
+- 5, 8 and 10 second options.
+- Telegram Mini App authentication verification.
+- Server-side Agnes video task creation and status polling.
+- Completed MP4 preview/link in the Mini App.
 
-## Required environment variables
-- `BOT_TOKEN`: Telegram bot token used by this Mini App.
-- `VIDEO_API_URL`: provider generation endpoint implementing the contract below.
-- `VIDEO_API_KEY`: provider API key.
+## Hosting environment variables
+Set these in your hosting provider's secret/environment-variable settings:
+- `BOT_TOKEN`: Telegram bot token for the Mini App.
+- `AGNES_API_KEY`: Agnes Platform API key. Never put it in frontend code or commit it to GitHub.
 
-## Video provider adapter contract
-The server sends a JSON POST request to `VIDEO_API_URL` with a Bearer token and:
-```json
-{
-  "prompt": "A cinematic scene...",
-  "mode": "text",
-  "aspect_ratio": "9:16",
-  "duration_seconds": 5,
-  "image": null,
-  "telegram_user_id": 123456
-}
-```
-For image-to-video, `image` contains `mime_type` and `data_base64`.
-The provider must return JSON with an `id` and optional `status`.
-The provider-specific API format must be adapted before enabling a real provider. Do not assume every provider uses this contract.
+After adding/changing environment variables, redeploy the service.
 
-## Important
-The interface can be previewed, but actual generation will return a clear setup message until a compatible provider endpoint and key are configured. The current adapter submits jobs; job polling, MP4 delivery to Telegram, durable job storage, and provider-specific integration remain to be implemented.
+## Agnes integration
+- Create: `POST https://apihub.agnes-ai.com/v1/videos`
+- Model: `agnes-video-2.5-flash`
+- Poll: `GET https://apihub.agnes-ai.com/agnesapi?video_id=...&model_name=agnes-video-2.5-flash`
+- Auth: `Authorization: Bearer $AGNES_API_KEY`
+
+The current backend uses the Agnes Video 2.5 request format and checks the returned top-level status and URL. Flash is 720P. Provider quota, availability and pricing can change; check your Agnes Platform console before production use.
+
+## Important limitations
+- Video jobs are currently tracked in process memory. Restarting the server loses the job-to-user lookup; use a persistent database before scaling or relying on long-running history.
+- The Mini App polls while it remains open. A background worker and persistent job storage are needed for reliable delivery when users close the app.
+- Completed MP4s are previewed/linked in the Mini App; automatic Telegram chat delivery is not implemented yet.
+- Image-to-video uses the uploaded image as the first keyframe.
