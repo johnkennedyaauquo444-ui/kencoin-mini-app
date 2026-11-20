@@ -50,7 +50,29 @@ async function generateVideo(){
   const form=new FormData();form.append('prompt',prompt);form.append('mode',mode);form.append('aspect_ratio',document.getElementById('ratio').value);form.append('duration',document.getElementById('duration').value);if(mode==='image')form.append('image',document.getElementById('imageFile').files[0]);
   const response=await fetch('/api/video/generate',{method:'POST',headers:{Authorization:'tma '+tg.initData},body:form});
   const data=await response.json();if(!response.ok)throw new Error(data.error||'Video service unavailable');
-  toast('Your video request was submitted.');jobs.unshift({prompt,status:data.status||'queued',id:data.id||'job'});renderHistory();
+  jobs.unshift({prompt,status:data.status||'queued',id:data.id||'job'});renderHistory();
+  document.getElementById('preview').textContent='Video is generating… please keep this Mini App open.';
+  toast('Video submitted to Agnes AI. Checking progress…');
+  let finished=false;
+  for(let attempt=0;attempt<60;attempt++){
+    await new Promise(resolve=>setTimeout(resolve,10000));
+    const check=await fetch('/api/video/status/'+encodeURIComponent(data.id),{headers:{Authorization:'tma '+tg.initData}});
+    const state=await check.json();
+    if(!check.ok)throw new Error(state.error||'Could not check video status.');
+    const job=jobs.find(j=>j.id===data.id);if(job){job.status=state.status;renderHistory();}
+    if(state.status==='completed'&&state.url){
+      const safeUrl=String(state.url);
+      const video=document.createElement('video');video.controls=true;video.playsInline=true;video.src=safeUrl;
+      const link=document.createElement('a');link.href=safeUrl;link.target='_blank';link.rel='noopener';link.textContent='Open / save MP4';link.className='secondary';
+      const preview=document.getElementById('preview');preview.textContent='';preview.append(video,document.createElement('br'),link);
+      if(tg?.openTelegramLink){/* Keep preview in Mini App; user can save/share from the video player. */}
+      toast('Your video is ready!');
+      finished=true;break;
+    }
+    if(state.status==='failed')throw new Error(state.error||'Video generation failed.');
+    document.getElementById('preview').textContent='Generating video… '+(state.progress!==null?state.progress+'%':'Please wait');
+  }
+  if(!finished)toast('Still processing. Check your generation again shortly.');
  }catch(e){toast(e.message||'Could not start video generation.');}
  finally{button.disabled=false;button.textContent='✦ GENERATE VIDEO'}
 }
